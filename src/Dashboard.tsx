@@ -192,13 +192,14 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
             <div className="dashboard-header">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
                     <h1>Mindscape <span style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>v2.0</span></h1>
-                    <input
-                        type="color"
-                        value={dashboardBg.startsWith('var') ? '#0f172a' : dashboardBg}
-                        onChange={e => handleDashboardBgChange(e.target.value)}
-                        title="Change Dashboard Background"
-                        style={{ cursor: 'pointer', background: 'transparent', border: 'none', width: '32px', height: '32px', padding: 0 }}
-                    />
+                    <div style={{ position: 'relative', width: '28px', height: '28px', borderRadius: '50%', overflow: 'hidden', border: '2px solid var(--border-color)', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} title="Change Dashboard Background">
+                        <input
+                            type="color"
+                            value={dashboardBg.startsWith('var') ? '#0f172a' : dashboardBg}
+                            onChange={e => handleDashboardBgChange(e.target.value)}
+                            style={{ position: 'absolute', top: '-10px', left: '-10px', width: '48px', height: '48px', cursor: 'pointer', border: 'none', background: 'none', padding: 0 }}
+                        />
+                    </div>
                 </div>
                 <p>A simple, powerful mind mapping tool.</p>
                 <div style={{ marginTop: '1rem' }}>
@@ -269,10 +270,19 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
                         </div>
                         <div className="project-card-meta" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <div
-                                    style={{ width: '16px', height: '16px', borderRadius: '50%', backgroundColor: project.backgroundColor || '#242424', border: '1px solid var(--border-color)' }}
-                                    title="Map Background Color"
-                                />
+                                <div style={{ position: 'relative', width: '20px', height: '20px', borderRadius: '50%', overflow: 'hidden', border: '1px solid var(--border-color)' }} title="Change Map Background Color">
+                                    <input
+                                        type="color"
+                                        value={project.backgroundColor || '#242424'}
+                                        onChange={e => {
+                                            const updated = { ...project, backgroundColor: e.target.value, updatedAt: Date.now() };
+                                            Store.saveProject(updated);
+                                            loadProjects();
+                                        }}
+                                        onClick={e => e.stopPropagation()}
+                                        style={{ position: 'absolute', top: '-10px', left: '-10px', width: '40px', height: '40px', cursor: 'pointer', border: 'none', background: 'none', padding: 0 }}
+                                    />
+                                </div>
                                 <span style={{ fontSize: '0.75rem' }}>Last updated: {new Date(project.updatedAt).toLocaleDateString()}</span>
                             </div>
                             <label onClick={e => e.stopPropagation()} style={{ cursor: 'pointer', color: 'var(--accent-color)', fontSize: '0.875rem' }}>
