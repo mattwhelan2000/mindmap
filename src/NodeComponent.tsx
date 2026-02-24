@@ -8,11 +8,13 @@ interface NodeProps {
     onDelete: (id: string) => void;
     onMoveNode: (draggedId: string, targetId: string) => void;
     onToggleCollapse?: (id: string, isCollapsed: boolean) => void;
+    onAddSibling?: (id: string) => void;
+    selectedNodeIds?: string[];
     isRoot?: boolean;
 }
 
-export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, onMoveNode, onToggleCollapse, isRoot }: NodeProps) {
-    const [isEditing, setIsEditing] = useState(false);
+export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, onMoveNode, onToggleCollapse, onAddSibling, selectedNodeIds, isRoot }: NodeProps) {
+    const [isEditing, setIsEditing] = useState(node.text === 'New Idea');
     const [text, setText] = useState(node.text);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -24,7 +26,18 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') handleBlur();
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleBlur();
+            if (onAddSibling && !isRoot) {
+                onAddSibling(node.id);
+            }
+        }
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            handleBlur();
+            onAddChild(node.id);
+        }
     };
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -70,7 +83,8 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
     return (
         <div className="node-wrapper">
             <div
-                className={`node-content ${isRoot ? 'node-root' : ''}`}
+                data-id={node.id}
+                className={`node-content ${isRoot ? 'node-root' : ''} ${selectedNodeIds && selectedNodeIds.includes(node.id) ? 'node-selected' : ''}`}
                 draggable={!isEditing && !isRoot}
                 onDragStart={handleDragStart}
                 onDragOver={handleDragOver}
@@ -86,13 +100,15 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
                 )}
 
                 {isEditing ? (
-                    <input
+                    <textarea
                         autoFocus
                         className="node-input"
                         value={text}
                         onChange={e => setText(e.target.value)}
                         onBlur={handleBlur}
                         onKeyDown={handleKeyDown}
+                        rows={text.split('\n').length}
+                        style={{ resize: 'none', overflow: 'hidden' }}
                     />
                 ) : (
                     <div className="node-text" onClick={() => setIsEditing(true)}>
@@ -146,6 +162,8 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
                             onDelete={onDelete}
                             onMoveNode={onMoveNode}
                             onToggleCollapse={onToggleCollapse}
+                            onAddSibling={onAddSibling}
+                            selectedNodeIds={selectedNodeIds}
                         />
                     ))}
                 </div>
