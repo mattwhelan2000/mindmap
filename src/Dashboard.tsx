@@ -224,6 +224,7 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
                         key={project.id}
                         className="project-card"
                         onClick={() => onOpenProject(project)}
+                        style={{ backgroundColor: project.backgroundColor || 'var(--bg-secondary)' }}
                     >
                         {project.thumbnail && (
                             <img
