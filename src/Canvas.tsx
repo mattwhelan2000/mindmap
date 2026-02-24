@@ -27,6 +27,15 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [titleText, setTitleText] = useState(project.name);
     const [showExportMenu, setShowExportMenu] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsFullscreen(!!document.fullscreenElement);
+        };
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, []);
 
     const clipboardRef = useRef<NodeData[]>([]);
     const importInputRef = useRef<HTMLInputElement>(null);
@@ -366,6 +375,18 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
             isCollapsed: false,
             children: project.rootNode.children.map(contractRec)
         });
+    };
+
+    const handleFullscreen = () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch((err) => {
+                alert(`Cannot enter fullscreen. If you are embedding this inside Wix, ensure the HTML iframe has the attribute 'allow="fullscreen"' or 'allowfullscreen'. Original error: ${err.message}`);
+            });
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
     };
 
     const handleMoveNode = (draggedId: string, targetId: string, placement: 'before' | 'after' | 'inside' = 'inside') => {
@@ -819,6 +840,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
             </div>
 
             <div className="canvas-zoom-controls" style={{ position: 'absolute', bottom: 20, right: 20, zIndex: 10, display: 'flex', gap: '0.5rem', background: 'var(--bg-secondary)', padding: '0.5rem', borderRadius: '0.5rem' }}>
+                <button className="btn-secondary" onClick={handleFullscreen} title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}>{isFullscreen ? '⤡' : '⤢'}</button>
                 <button className="btn-secondary" onClick={handleCenterNode} title="Re-Center on Root Node">⌖</button>
                 <button className="btn-secondary" onClick={handleFrameAll} title="Frame Entire Tree">[ ]</button>
                 <button className="btn-secondary" onClick={() => setScale(s => Math.max(0.2, s - 0.2))}>-</button>
