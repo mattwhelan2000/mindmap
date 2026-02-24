@@ -259,8 +259,91 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
     };
 
     const handleToggleCollapse = (id: string, isCollapsed: boolean) => {
-        const updatedRoot = updateNodeRec(project.rootNode, id, (n) => ({ ...n, isCollapsed }));
-        commitUpdate(updatedRoot);
+        const nodeEl = document.querySelector(`[data-id="${id}"]`);
+        if (nodeEl) {
+            const rectBefore = nodeEl.getBoundingClientRect();
+            const updatedRoot = updateNodeRec(project.rootNode, id, (n) => ({ ...n, isCollapsed }));
+            commitUpdate(updatedRoot);
+
+            requestAnimationFrame(() => {
+                const rectAfter = nodeEl.getBoundingClientRect();
+                const deltaX = rectAfter.left - rectBefore.left;
+                const deltaY = rectAfter.top - rectBefore.top;
+
+                if (deltaX !== 0 || deltaY !== 0) {
+                    setPosition(prev => ({ x: prev.x - deltaX, y: prev.y - deltaY }));
+                }
+            });
+        } else {
+            const updatedRoot = updateNodeRec(project.rootNode, id, (n) => ({ ...n, isCollapsed }));
+            commitUpdate(updatedRoot);
+        }
+    };
+
+    const handleCenterNode = () => {
+        const rootEl = document.querySelector('.node-root');
+        if (rootEl) {
+            const rect = rootEl.getBoundingClientRect();
+            const deltaX = (window.innerWidth / 2) - (rect.left + rect.width / 2);
+            const deltaY = 100 - rect.top;
+            setPosition(prev => ({ x: prev.x + deltaX, y: prev.y + deltaY }));
+        }
+    };
+
+    const handleFrameAll = () => {
+        const nodes = Array.from(document.querySelectorAll('.node-content')) as HTMLElement[];
+        if (nodes.length === 0) return;
+
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        nodes.forEach(n => {
+            const rect = n.getBoundingClientRect();
+            minX = Math.min(minX, (rect.left - position.x) / scale);
+            minY = Math.min(minY, (rect.top - position.y) / scale);
+            maxX = Math.max(maxX, (rect.right - position.x) / scale);
+            maxY = Math.max(maxY, (rect.bottom - position.y) / scale);
+        });
+
+        const localWidth = maxX - minX;
+        const localHeight = maxY - minY;
+
+        const padding = 80;
+        const targetWidth = window.innerWidth - padding * 2;
+        const targetHeight = window.innerHeight - padding * 2;
+
+        const scaleX = targetWidth / localWidth;
+        const scaleY = targetHeight / localHeight;
+        const newScale = Math.min(scaleX, scaleY, 2);
+
+        const localCenterX = minX + localWidth / 2;
+        const localCenterY = minY + localHeight / 2;
+
+        const newPositionX = (window.innerWidth / 2) - (localCenterX * newScale);
+        const newPositionY = (window.innerHeight / 2) - (localCenterY * newScale);
+
+        setScale(newScale);
+        setPosition({ x: newPositionX, y: newPositionY });
+    };
+
+    const handleExpandAll = () => {
+        const expandRec = (node: NodeData): NodeData => ({
+            ...node,
+            isCollapsed: false,
+            children: node.children.map(expandRec)
+        });
+        commitUpdate(expandRec(project.rootNode));
+    };
+
+    const handleContractAll = () => {
+        const contractRec = (node: NodeData): NodeData => ({
+            ...node,
+            isCollapsed: true,
+            children: node.children.map(contractRec)
+        });
+        commitUpdate({
+            ...project.rootNode,
+            isCollapsed: false,
+            children: project.rootNode.children.map(contractRec)
+        });
     };
 
     const handleMoveNode = (draggedId: string, targetId: string, placement: 'before' | 'after' | 'inside' = 'inside') => {
@@ -692,6 +775,10 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                         {project.name}
                     </span>
                 )}
+
+                <button className="btn-secondary" onClick={handleExpandAll} title="Expand All Nodes">↧ Expand All</button>
+                <button className="btn-secondary" onClick={handleContractAll} title="Contract All Nodes">↥ Contract All</button>
+
                 <div style={{ position: 'relative' }}>
                     <button className="btn-primary" onClick={() => setShowExportMenu(!showExportMenu)}>Share ▾</button>
                     {showExportMenu && (
@@ -710,7 +797,8 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
             </div>
 
             <div className="canvas-zoom-controls" style={{ position: 'absolute', bottom: 20, right: 20, zIndex: 10, display: 'flex', gap: '0.5rem', background: 'var(--bg-secondary)', padding: '0.5rem', borderRadius: '0.5rem' }}>
-                <button className="btn-secondary" onClick={() => { setScale(1); setPosition({ x: window.innerWidth / 2, y: 100 }); }} title="Re-Center">⌖</button>
+                <button className="btn-secondary" onClick={handleCenterNode} title="Re-Center on Root Node">⌖</button>
+                <button className="btn-secondary" onClick={handleFrameAll} title="Frame Entire Tree">[ ]</button>
                 <button className="btn-secondary" onClick={() => setScale(s => Math.max(0.2, s - 0.2))}>-</button>
                 <span style={{ display: 'flex', alignItems: 'center', width: '40px', justifyContent: 'center' }}>{Math.round(scale * 100)}%</span>
                 <button className="btn-secondary" onClick={() => setScale(s => Math.min(3, s + 0.2))}>+</button>
