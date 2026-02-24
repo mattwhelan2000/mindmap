@@ -6,10 +6,11 @@ interface NodeProps {
     onUpdate: (id: string, text: string, image?: string) => void;
     onAddChild: (id: string) => void;
     onDelete: (id: string) => void;
+    onMoveNode: (draggedId: string, targetId: string) => void;
     isRoot?: boolean;
 }
 
-export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, isRoot }: NodeProps) {
+export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, onMoveNode, isRoot }: NodeProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [text, setText] = useState(node.text);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -41,9 +42,41 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, is
         onUpdate(node.id, node.text, undefined);
     };
 
+    const handleDragStart = (e: React.DragEvent) => {
+        if (isRoot) {
+            e.preventDefault();
+            return;
+        }
+        e.dataTransfer.setData('text/plain', node.id);
+        e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.currentTarget.classList.remove('drag-over');
+        const draggedId = e.dataTransfer.getData('text/plain');
+        if (draggedId && draggedId !== node.id) {
+            onMoveNode(draggedId, node.id);
+        }
+    };
+
     return (
         <div className="node-wrapper">
-            <div className={`node-content ${isRoot ? 'node-root' : ''}`}>
+            <div
+                className={`node-content ${isRoot ? 'node-root' : ''}`}
+                draggable={!isEditing && !isRoot}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                onDragEnter={e => { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }}
+                onDragLeave={e => { e.currentTarget.classList.remove('drag-over'); }}
+            >
                 {node.image && (
                     <div className="node-image-container">
                         <img src={node.image} alt="Node attachment" className="node-image" />
@@ -97,6 +130,7 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, is
                             onUpdate={onUpdate}
                             onAddChild={onAddChild}
                             onDelete={onDelete}
+                            onMoveNode={onMoveNode}
                         />
                     ))}
                 </div>

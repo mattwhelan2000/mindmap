@@ -289,8 +289,8 @@ button {
   border: 1px solid var(--border-color);
   border-radius: 0.5rem;
   padding: 1rem;
-  min-width: 150px;
-  max-width: 250px;
+  min-width: 300px;
+  max-width: 500px;
   position: relative;
   z-index: 10;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
@@ -309,6 +309,11 @@ button {
   border-color: var(--accent-color);
   box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
   border-width: 2px;
+}
+
+.node-content.drag-over {
+  border-color: var(--accent-hover);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3);
 }
 
 .node-text {

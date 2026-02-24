@@ -18,27 +18,23 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
 
     // Pan and Zoom logic
     const handleWheel = (e: React.WheelEvent) => {
-        e.preventDefault();
-        if (e.ctrlKey || e.metaKey) {
-            // Zoom
-            const zoomFactor = 0.1;
-            const newScale = e.deltaY < 0 ? scale + zoomFactor : scale - zoomFactor;
-            setScale(Math.min(Math.max(newScale, 0.2), 3));
-        } else {
-            // Pan
-            setPosition(prev => ({
-                x: prev.x - e.deltaX,
-                y: prev.y - e.deltaY
-            }));
-        }
+        // Any wheel action should zoom
+        const zoomFactor = 0.05;
+        const newScale = e.deltaY < 0 ? scale + zoomFactor : scale - zoomFactor;
+        setScale(Math.min(Math.max(newScale, 0.2), 3));
     };
 
     const handleMouseDown = (e: React.MouseEvent) => {
-        // Only drag on canvas background, not on nodes
-        if ((e.target as HTMLElement).classList.contains('canvas-background')) {
-            setIsDragging(true);
-            setDragStart({ x: e.clientX, y: e.clientY });
+        // Allow dragging from anywhere EXCEPT inside a node input/button
+        if ((e.target as HTMLElement).closest('.node-input, button, .node-action-btn, .node-children')) {
+            // Let the user interact with the node elements
+            if (!(e.target as HTMLElement).classList.contains('node-children')) {
+                return;
+            }
         }
+
+        setIsDragging(true);
+        setDragStart({ x: e.clientX, y: e.clientY });
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
@@ -105,6 +101,38 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
         }
     };
 
+    const handleMoveNode = (draggedId: string, targetId: string) => {
+        if (draggedId === targetId) return;
+
+        let isDescendant = false;
+        const checkDescendant = (n: NodeData) => {
+            if (n.id === targetId) isDescendant = true;
+            n.children.forEach(checkDescendant);
+        };
+
+        let draggedNode: NodeData | null = null;
+        const findAndCheck = (n: NodeData) => {
+            if (n.id === draggedId) {
+                draggedNode = JSON.parse(JSON.stringify(n));
+                checkDescendant(n);
+            }
+            if (!draggedNode) n.children.forEach(findAndCheck);
+        };
+        findAndCheck(project.rootNode);
+
+        if (isDescendant || !draggedNode) return;
+
+        const rootAfterDelete = deleteNodeRec(project.rootNode, draggedId);
+        if (!rootAfterDelete) return;
+
+        const updatedRoot = updateNodeRec(rootAfterDelete, targetId, (n) => ({
+            ...n,
+            children: [...n.children, draggedNode!]
+        }));
+
+        onUpdate({ ...project, rootNode: updatedRoot, updatedAt: Date.now() });
+    };
+
     const handleExport = () => {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(project));
         const a = document.createElement('a');
@@ -118,7 +146,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
         const el = canvasRef.current;
         if (!el) return;
         const preventDefaultWheel = (e: WheelEvent) => {
-            if (e.ctrlKey || e.metaKey) e.preventDefault();
+            e.preventDefault(); // Prevent full page scroll when zooming on canvas
         };
         el.addEventListener('wheel', preventDefaultWheel, { passive: false });
         return () => el.removeEventListener('wheel', preventDefaultWheel);
@@ -176,6 +204,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                     onUpdate={handleNodeUpdate}
                     onAddChild={handleAddChild}
                     onDelete={handleDeleteNode}
+                    onMoveNode={handleMoveNode}
                     isRoot={true}
                 />
             </div>
