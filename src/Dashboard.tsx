@@ -22,11 +22,6 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
         setProjects(Store.getProjects());
     };
 
-    const handleProjectUpdate = (updatedProject: ProjectData) => {
-        Store.saveProject(updatedProject); // Assuming Store.saveProject is the correct function
-        setProjects(p => p.map(proj => proj.id === updatedProject.id ? updatedProject : proj));
-    };
-
     const handleTitleBlur = (id: string) => {
         if (editTitleText.trim() !== '') {
             const project = projects.find(p => p.id === id);
@@ -186,7 +181,7 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
     return (
         <div className="dashboard-container">
             <div className="dashboard-header">
-                <h1>Mindscape <span style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>v1.7</span></h1>
+                <h1>Mindscape <span style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>v1.8</span></h1>
                 <p>A simple, powerful mind mapping tool.</p>
                 <div style={{ marginTop: '1rem' }}>
                     <label className="btn-secondary" style={{ cursor: 'pointer', display: 'inline-block' }}>
