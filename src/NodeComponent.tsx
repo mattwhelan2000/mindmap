@@ -3,7 +3,7 @@ import type { NodeData } from './store';
 
 interface NodeProps {
     node: NodeData;
-    onUpdate: (id: string, text: string, image?: string, width?: number, url?: string) => void;
+    onUpdate: (id: string, text: string, image?: string, width?: number, url?: string, singleNodeResize?: boolean) => void;
     onAddChild: (id: string) => void;
     onDelete: (id: string) => void;
     onMoveNode: (draggedId: string, targetId: string, placement?: 'before' | 'after' | 'inside') => void;
@@ -103,12 +103,12 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
         }
     };
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (e: React.MouseEvent) => {
         // If the user manually resizes using CSS, the width on the ref changes
         if (nodeRef.current) {
             const currentWidth = nodeRef.current.getBoundingClientRect().width;
             if (node.width !== currentWidth) {
-                onUpdate(node.id, node.text, node.image, currentWidth, node.url);
+                onUpdate(node.id, node.text, node.image, currentWidth, node.url, e.altKey);
             }
         }
     };

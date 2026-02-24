@@ -202,16 +202,42 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
         };
     };
 
-    const handleNodeUpdate = (id: string, text: string, image?: string, width?: number, url?: string) => {
+    const handleNodeUpdate = (id: string, text: string, image?: string, width?: number, url?: string, singleNodeResize: boolean = false) => {
+        const cascadeWidth = (node: NodeData): NodeData => ({
+            ...node,
+            width,
+            children: node.children.map(cascadeWidth)
+        });
+
+        if (width !== undefined && !singleNodeResize && id !== project.rootNode.id) {
+            let parentId: string | null = null;
+            const findParent = (node: NodeData, currentParent: string | null) => {
+                if (node.id === id) parentId = currentParent;
+                node.children.forEach(c => findParent(c, node.id));
+            };
+            findParent(project.rootNode, null);
+
+            if (parentId) {
+                // Resize all siblings and their descendants
+                let updatedRoot = updateNodeRec(project.rootNode, parentId, (parent) => ({
+                    ...parent,
+                    children: parent.children.map(child => cascadeWidth(child))
+                }));
+                // Apply specific text/image/url updates to the exact target node
+                updatedRoot = updateNodeRec(updatedRoot, id, (n) => ({ ...n, text, image, url }));
+                commitUpdate(updatedRoot);
+                return;
+            }
+        }
+
         const updatedRoot = updateNodeRec(project.rootNode, id, (n) => {
             if (width !== undefined && width !== n.width) {
-                const cascadeWidth = (node: NodeData): NodeData => ({
-                    ...node,
-                    width,
-                    children: node.children.map(cascadeWidth)
-                });
-                const cascadedNode = cascadeWidth(n);
-                return { ...cascadedNode, text, image, url };
+                if (singleNodeResize) {
+                    return { ...n, text, image, width, url };
+                } else {
+                    const cascadedNode = cascadeWidth(n);
+                    return { ...cascadedNode, text, image, url };
+                }
             }
             return { ...n, text, image, width, url };
         });
