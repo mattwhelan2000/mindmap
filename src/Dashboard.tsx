@@ -42,7 +42,8 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
         if (!file) return;
 
         try {
-            if (file.name.endsWith('.xmind')) {
+            const fileName = file.name.toLowerCase();
+            if (fileName.endsWith('.xmind')) {
                 const zip = new JSZip();
                 const loadedZip = await zip.loadAsync(file);
                 const contentFile = loadedZip.file('content.json');
@@ -65,7 +66,7 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
                 const rootNode = parseXmindNode(sheet.rootTopic);
                 const newProject: ProjectData = {
                     id: generateId(),
-                    name: file.name.replace('.xmind', ''),
+                    name: file.name.replace(/\.xmind$/i, ''),
                     updatedAt: Date.now(),
                     rootNode: rootNode
                 };
@@ -74,8 +75,9 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
 
             } else {
                 const text = await file.text();
+                const fileName = file.name.toLowerCase();
 
-                if (file.name.endsWith('.json')) {
+                if (fileName.endsWith('.json')) {
                     const data = JSON.parse(text);
 
                     if (data.id && data.rootNode) {
@@ -106,7 +108,7 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
                         const rootNode = parseGenericNode(data);
                         const newProject: ProjectData = {
                             id: generateId(),
-                            name: data.name || file.name.replace('.json', ''),
+                            name: data.name || file.name.replace(/\.json$/i, ''),
                             updatedAt: Date.now(),
                             rootNode: rootNode
                         };
@@ -115,7 +117,7 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
                     } else {
                         throw new Error("Invalid Mind Map JSON format.");
                     }
-                } else if (file.name.endsWith('.md')) {
+                } else if (fileName.endsWith('.md')) {
                     // Parse Xmind Markdown Export
                     const lines = text.split('\n').map(l => l.trimEnd()).filter(l => l.length > 0);
                     if (lines.length === 0) return;
@@ -143,12 +145,14 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
 
                     const newProject: ProjectData = {
                         id: generateId(),
-                        name: file.name.replace('.md', ''),
+                        name: file.name.replace(/\.md$/i, ''),
                         updatedAt: Date.now(),
                         rootNode: rootNode
                     };
                     Store.saveProject(newProject);
                     loadProjects();
+                } else {
+                    throw new Error("Unsupported file extension. Please use .json, .md, or .xmind");
                 }
             }
         } catch (err: any) {
@@ -161,7 +165,7 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
     return (
         <div className="dashboard-container">
             <div className="dashboard-header">
-                <h1>Mindscape <span style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>v1.2</span></h1>
+                <h1>Mindscape <span style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>v1.3</span></h1>
                 <p>A simple, powerful mind mapping tool.</p>
                 <div style={{ marginTop: '1rem' }}>
                     <label className="btn-secondary" style={{ cursor: 'pointer', display: 'inline-block' }}>
