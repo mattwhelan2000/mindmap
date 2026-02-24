@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Store } from './store';
 import type { ProjectData } from './store';
+import JSZip from 'jszip';
 
 interface DashboardProps {
     onOpenProject: (project: ProjectData) => void;
@@ -36,90 +37,116 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
         }
     };
 
-    const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            try {
-                const text = event.target?.result as string;
+        try {
+            if (file.name.endsWith('.xmind')) {
+                const zip = new JSZip();
+                const loadedZip = await zip.loadAsync(file);
+                const contentFile = loadedZip.file('content.json');
+
+                if (!contentFile) throw new Error("Could not find content.json in Xmind file. Only Xmind 8/Zen and later are supported.");
+                const contentStr = await contentFile.async('string');
+                const content = JSON.parse(contentStr);
+
+                // Usually an array of sheets, take first sheet.
+                const sheet = Array.isArray(content) ? content[0] : content;
+                const parseXmindNode = (topic: any): any => {
+                    const childrenArr = topic.children?.attached || topic.children || [];
+                    return {
+                        id: crypto.randomUUID(),
+                        text: topic.title || 'Untitled',
+                        children: childrenArr.map(parseXmindNode)
+                    };
+                };
+
+                const rootNode = parseXmindNode(sheet.rootTopic);
+                const newProject: ProjectData = {
+                    id: crypto.randomUUID(),
+                    name: file.name.replace('.xmind', ''),
+                    updatedAt: Date.now(),
+                    rootNode: rootNode
+                };
+                Store.saveProject(newProject);
+                loadProjects();
+
+            } else {
+                const text = await file.text();
 
                 if (file.name.endsWith('.json')) {
-                    const project: ProjectData = JSON.parse(text);
-                    if (project.id && project.rootNode) {
-                        project.id = crypto.randomUUID(); // Give it a new ID to avoid collisions
-                        Store.saveProject(project);
+                    const data = JSON.parse(text);
+
+                    if (data.id && data.rootNode) {
+                        // Native app export
+                        data.id = crypto.randomUUID();
+                        Store.saveProject(data);
+                        loadProjects();
+                    } else if (data.name || data.text || data.title) {
+                        // Generic JSON tree (like the user's example)
+                        const parseGenericNode = (node: any): any => {
+                            let nodeText = node.name || node.text || node.title || 'Untitled';
+                            if (node.description) nodeText += `\n(${node.description})`;
+                            return {
+                                id: crypto.randomUUID(),
+                                text: nodeText,
+                                children: Array.isArray(node.children) ? node.children.map(parseGenericNode) : []
+                            };
+                        };
+
+                        const rootNode = parseGenericNode(data);
+                        const newProject: ProjectData = {
+                            id: crypto.randomUUID(),
+                            name: data.name || file.name.replace('.json', ''),
+                            updatedAt: Date.now(),
+                            rootNode: rootNode
+                        };
+                        Store.saveProject(newProject);
                         loadProjects();
                     } else {
-                        alert("Invalid Mind Map JSON format.");
+                        throw new Error("Invalid Mind Map JSON format.");
                     }
                 } else if (file.name.endsWith('.md')) {
                     // Parse Xmind Markdown Export
                     const lines = text.split('\n').map(l => l.trimEnd()).filter(l => l.length > 0);
                     if (lines.length === 0) return;
 
-                    // Helper to count heading depth: "# Root" -> 1, "## Child" -> 2
-                    // Or list items: "- Child" -> depth based on indent
                     const getDepth = (line: string) => {
                         const match = line.match(/^(#+)\s(.*)/);
                         if (match) return { depth: match[1].length, text: match[2].trim() };
-
                         const listMatch = line.match(/^(\s*)-\s(.*)/);
-                        if (listMatch) {
-                            return { depth: Math.floor(listMatch[1].length / 4) + 2, text: listMatch[2].trim() };
-                        }
+                        if (listMatch) return { depth: Math.floor(listMatch[1].length / 4) + 2, text: listMatch[2].trim() };
                         return null;
                     };
 
                     const rootData = getDepth(lines[0]) || { depth: 1, text: lines[0].replace(/^#+\s*/, '') };
-
-                    const rootNode: any = {
-                        id: crypto.randomUUID(),
-                        text: rootData.text || 'Imported Mind Map',
-                        children: []
-                    };
-
+                    const rootNode: any = { id: crypto.randomUUID(), text: rootData.text || 'Imported Mind Map', children: [] };
                     const stack = [{ node: rootNode, depth: rootData.depth }];
 
                     for (let i = 1; i < lines.length; i++) {
                         const lineData = getDepth(lines[i]);
                         if (!lineData) continue;
-
-                        const newNode = {
-                            id: crypto.randomUUID(),
-                            text: lineData.text,
-                            children: []
-                        };
-
-                        while (stack.length > 0 && stack[stack.length - 1].depth >= lineData.depth) {
-                            stack.pop();
-                        }
-
-                        if (stack.length > 0) {
-                            stack[stack.length - 1].node.children.push(newNode);
-                        }
-
+                        const newNode = { id: crypto.randomUUID(), text: lineData.text, children: [] };
+                        while (stack.length > 0 && stack[stack.length - 1].depth >= lineData.depth) stack.pop();
+                        if (stack.length > 0) stack[stack.length - 1].node.children.push(newNode);
                         stack.push({ node: newNode, depth: lineData.depth });
                     }
 
-                    const projectName = file.name.replace('.md', '');
                     const newProject: ProjectData = {
                         id: crypto.randomUUID(),
-                        name: projectName,
+                        name: file.name.replace('.md', ''),
                         updatedAt: Date.now(),
                         rootNode: rootNode
                     };
-
                     Store.saveProject(newProject);
                     loadProjects();
                 }
-            } catch (err) {
-                alert("Failed to parse file.");
-                console.error(err);
             }
-        };
-        reader.readAsText(file);
+        } catch (err: any) {
+            alert(`Failed to import file: ${err.message || 'Unknown error'}`);
+            console.error(err);
+        }
         e.target.value = ''; // Reset
     };
 
@@ -130,8 +157,8 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
                 <p>A simple, powerful mind mapping tool.</p>
                 <div style={{ marginTop: '1rem' }}>
                     <label className="btn-secondary" style={{ cursor: 'pointer', display: 'inline-block' }}>
-                        Import Map (.json, .md)
-                        <input type="file" accept=".json,.md" onChange={handleImport} style={{ display: 'none' }} />
+                        Import Map (.json, .md, .xmind)
+                        <input type="file" accept=".json,.md,.xmind" onChange={handleImport} style={{ display: 'none' }} />
                     </label>
                 </div>
             </div>
