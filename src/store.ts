@@ -10,6 +10,7 @@ export type NodeData = {
   text: string;
   image?: string; // base64 string
   isCollapsed?: boolean;
+  width?: number; // Added to persist manual scaling
   children: NodeData[];
 };
 

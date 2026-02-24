@@ -3,7 +3,7 @@ import type { NodeData } from './store';
 
 interface NodeProps {
     node: NodeData;
-    onUpdate: (id: string, text: string, image?: string) => void;
+    onUpdate: (id: string, text: string, image?: string, width?: number) => void;
     onAddChild: (id: string) => void;
     onDelete: (id: string) => void;
     onMoveNode: (draggedId: string, targetId: string) => void;
@@ -17,11 +17,12 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
     const [isEditing, setIsEditing] = useState(node.text === 'New Idea');
     const [text, setText] = useState(node.text);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const nodeRef = useRef<HTMLDivElement>(null);
 
     const handleBlur = () => {
         setIsEditing(false);
         if (text !== node.text) {
-            onUpdate(node.id, text, node.image);
+            onUpdate(node.id, text, node.image, node.width);
         }
     };
 
@@ -46,14 +47,14 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
             const reader = new FileReader();
             reader.onload = (event) => {
                 const base64 = event.target?.result as string;
-                onUpdate(node.id, node.text, base64);
+                onUpdate(node.id, node.text, base64, node.width);
             };
             reader.readAsDataURL(file);
         }
     };
 
     const handleRemoveImage = () => {
-        onUpdate(node.id, node.text, undefined);
+        onUpdate(node.id, node.text, undefined, node.width);
     };
 
     const handleDragStart = (e: React.DragEvent) => {
@@ -80,9 +81,20 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
         }
     };
 
+    const handleMouseUp = () => {
+        // If the user manually resizes using CSS, the width on the ref changes
+        if (nodeRef.current) {
+            const currentWidth = nodeRef.current.getBoundingClientRect().width;
+            if (node.width !== currentWidth) {
+                onUpdate(node.id, node.text, node.image, currentWidth);
+            }
+        }
+    };
+
     return (
         <div className="node-wrapper">
             <div
+                ref={nodeRef}
                 data-id={node.id}
                 className={`node-content ${isRoot ? 'node-root' : ''} ${selectedNodeIds && selectedNodeIds.includes(node.id) ? 'node-selected' : ''}`}
                 draggable={!isEditing && !isRoot}
@@ -91,6 +103,8 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
                 onDrop={handleDrop}
                 onDragEnter={e => { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }}
                 onDragLeave={e => { e.currentTarget.classList.remove('drag-over'); }}
+                onMouseUp={handleMouseUp}
+                style={{ width: node.width ? `${node.width}px` : undefined }}
             >
                 {node.image && (
                     <div className="node-image-container">

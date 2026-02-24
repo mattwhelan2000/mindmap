@@ -129,8 +129,8 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
         };
     };
 
-    const handleNodeUpdate = (id: string, text: string, image?: string) => {
-        const updatedRoot = updateNodeRec(project.rootNode, id, (n) => ({ ...n, text, image }));
+    const handleNodeUpdate = (id: string, text: string, image?: string, width?: number) => {
+        const updatedRoot = updateNodeRec(project.rootNode, id, (n) => ({ ...n, text, image, width }));
         onUpdate({ ...project, rootNode: updatedRoot, updatedAt: Date.now() });
     };
 
