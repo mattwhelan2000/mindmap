@@ -14,10 +14,17 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
     const [newBgColor, setNewBgColor] = useState('#242424');
     const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
     const [editTitleText, setEditTitleText] = useState('');
+    const [dashboardBg, setDashboardBg] = useState(() => localStorage.getItem('dashboardBgColor') || 'var(--bg-primary)');
 
     useEffect(() => {
         loadProjects();
-    }, []);
+        document.documentElement.style.setProperty('--dashboard-bg', dashboardBg);
+    }, [dashboardBg]);
+
+    const handleDashboardBgChange = (color: string) => {
+        setDashboardBg(color);
+        localStorage.setItem('dashboardBgColor', color);
+    };
 
     const loadProjects = () => {
         setProjects(Store.getProjects());
@@ -181,9 +188,18 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
     };
 
     return (
-        <div className="dashboard-container">
+        <div className="dashboard-container" style={{ backgroundColor: dashboardBg, minHeight: '100vh', transition: 'background-color 0.3s ease' }}>
             <div className="dashboard-header">
-                <h1>Mindscape <span style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>v2.0</span></h1>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
+                    <h1>Mindscape <span style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>v2.0</span></h1>
+                    <input
+                        type="color"
+                        value={dashboardBg.startsWith('var') ? '#0f172a' : dashboardBg}
+                        onChange={e => handleDashboardBgChange(e.target.value)}
+                        title="Change Dashboard Background"
+                        style={{ cursor: 'pointer', background: 'transparent', border: 'none', width: '32px', height: '32px', padding: 0 }}
+                    />
+                </div>
                 <p>A simple, powerful mind mapping tool.</p>
                 <div style={{ marginTop: '1rem' }}>
                     <label className="btn-secondary" style={{ cursor: 'pointer', display: 'inline-block' }}>
@@ -252,7 +268,13 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
                             </button>
                         </div>
                         <div className="project-card-meta" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span>Last updated: {new Date(project.updatedAt).toLocaleDateString()}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <div
+                                    style={{ width: '16px', height: '16px', borderRadius: '50%', backgroundColor: project.backgroundColor || '#242424', border: '1px solid var(--border-color)' }}
+                                    title="Map Background Color"
+                                />
+                                <span style={{ fontSize: '0.75rem' }}>Last updated: {new Date(project.updatedAt).toLocaleDateString()}</span>
+                            </div>
                             <label onClick={e => e.stopPropagation()} style={{ cursor: 'pointer', color: 'var(--accent-color)', fontSize: '0.875rem' }}>
                                 Add Image
                                 <input
