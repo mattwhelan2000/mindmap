@@ -102,6 +102,11 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
         }
     };
 
+    const handleToggleCollapse = (id: string, isCollapsed: boolean) => {
+        const updatedRoot = updateNodeRec(project.rootNode, id, (n) => ({ ...n, isCollapsed }));
+        onUpdate({ ...project, rootNode: updatedRoot, updatedAt: Date.now() });
+    };
+
     const handleMoveNode = (draggedId: string, targetId: string) => {
         if (draggedId === targetId) return;
 
@@ -206,6 +211,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                     onAddChild={handleAddChild}
                     onDelete={handleDeleteNode}
                     onMoveNode={handleMoveNode}
+                    onToggleCollapse={handleToggleCollapse}
                     isRoot={true}
                 />
             </div>

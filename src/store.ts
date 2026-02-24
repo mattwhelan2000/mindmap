@@ -9,6 +9,7 @@ export type NodeData = {
   id: string;
   text: string;
   image?: string; // base64 string
+  isCollapsed?: boolean;
   children: NodeData[];
 };
 

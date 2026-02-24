@@ -7,10 +7,11 @@ interface NodeProps {
     onAddChild: (id: string) => void;
     onDelete: (id: string) => void;
     onMoveNode: (draggedId: string, targetId: string) => void;
+    onToggleCollapse?: (id: string, isCollapsed: boolean) => void;
     isRoot?: boolean;
 }
 
-export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, onMoveNode, isRoot }: NodeProps) {
+export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, onMoveNode, onToggleCollapse, isRoot }: NodeProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [text, setText] = useState(node.text);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -119,9 +120,22 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
                         </button>
                     )}
                 </div>
+
+                {node.children && node.children.length > 0 && (
+                    <button
+                        className="node-collapse-btn"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (onToggleCollapse) onToggleCollapse(node.id, !node.isCollapsed);
+                        }}
+                        title={node.isCollapsed ? "Expand Node" : "Collapse Node"}
+                    >
+                        {node.isCollapsed ? '+' : '-'}
+                    </button>
+                )}
             </div>
 
-            {node.children && node.children.length > 0 && (
+            {!node.isCollapsed && node.children && node.children.length > 0 && (
                 <div className="node-children">
                     {node.children.map(child => (
                         <NodeComponent
@@ -131,6 +145,7 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
                             onAddChild={onAddChild}
                             onDelete={onDelete}
                             onMoveNode={onMoveNode}
+                            onToggleCollapse={onToggleCollapse}
                         />
                     ))}
                 </div>
