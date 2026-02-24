@@ -43,17 +43,80 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
         const reader = new FileReader();
         reader.onload = (event) => {
             try {
-                const json = event.target?.result as string;
-                const project: ProjectData = JSON.parse(json);
-                if (project.id && project.rootNode) {
-                    // Check for id collision and generate anew if necessary, but for simplicity just save it
-                    Store.saveProject(project);
+                const text = event.target?.result as string;
+
+                if (file.name.endsWith('.json')) {
+                    const project: ProjectData = JSON.parse(text);
+                    if (project.id && project.rootNode) {
+                        project.id = crypto.randomUUID(); // Give it a new ID to avoid collisions
+                        Store.saveProject(project);
+                        loadProjects();
+                    } else {
+                        alert("Invalid Mind Map JSON format.");
+                    }
+                } else if (file.name.endsWith('.md')) {
+                    // Parse Xmind Markdown Export
+                    const lines = text.split('\n').map(l => l.trimEnd()).filter(l => l.length > 0);
+                    if (lines.length === 0) return;
+
+                    // Helper to count heading depth: "# Root" -> 1, "## Child" -> 2
+                    // Or list items: "- Child" -> depth based on indent
+                    const getDepth = (line: string) => {
+                        const match = line.match(/^(#+)\s(.*)/);
+                        if (match) return { depth: match[1].length, text: match[2].trim() };
+
+                        const listMatch = line.match(/^(\s*)-\s(.*)/);
+                        if (listMatch) {
+                            return { depth: Math.floor(listMatch[1].length / 4) + 2, text: listMatch[2].trim() };
+                        }
+                        return null;
+                    };
+
+                    const rootData = getDepth(lines[0]) || { depth: 1, text: lines[0].replace(/^#+\s*/, '') };
+
+                    const rootNode: any = {
+                        id: crypto.randomUUID(),
+                        text: rootData.text || 'Imported Mind Map',
+                        children: []
+                    };
+
+                    const stack = [{ node: rootNode, depth: rootData.depth }];
+
+                    for (let i = 1; i < lines.length; i++) {
+                        const lineData = getDepth(lines[i]);
+                        if (!lineData) continue;
+
+                        const newNode = {
+                            id: crypto.randomUUID(),
+                            text: lineData.text,
+                            children: []
+                        };
+
+                        while (stack.length > 0 && stack[stack.length - 1].depth >= lineData.depth) {
+                            stack.pop();
+                        }
+
+                        if (stack.length > 0) {
+                            stack[stack.length - 1].node.children.push(newNode);
+                        }
+
+                        stack.push({ node: newNode, depth: lineData.depth });
+                    }
+
+                    const projectName = file.name.replace('.md', '');
+                    const newProject: ProjectData = {
+                        id: crypto.randomUUID(),
+                        name: projectName,
+                        updatedAt: Date.now(),
+                        rootNode: rootNode
+                    };
+
+                    Store.saveProject(newProject);
                     loadProjects();
-                } else {
-                    alert("Invalid Mind Map file format.");
                 }
             } catch (err) {
-                alert("Failed to parse JSON.");
+                alert("Failed to parse file.");
+                console.error(err);
             }
         };
         reader.readAsText(file);
@@ -67,8 +130,8 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
                 <p>A simple, powerful mind mapping tool.</p>
                 <div style={{ marginTop: '1rem' }}>
                     <label className="btn-secondary" style={{ cursor: 'pointer', display: 'inline-block' }}>
-                        Import Mind Map
-                        <input type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
+                        Import Map (.json, .md)
+                        <input type="file" accept=".json,.md" onChange={handleImport} style={{ display: 'none' }} />
                     </label>
                 </div>
             </div>
