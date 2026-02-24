@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import type { ProjectData, NodeData } from './store';
+import { generateId } from './store';
 import NodeComponent from './NodeComponent';
 
 interface CanvasProps {
@@ -77,7 +78,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
 
     const handleAddChild = (parentId: string) => {
         const newNode: NodeData = {
-            id: crypto.randomUUID(),
+            id: generateId(),
             text: 'New Idea',
             children: []
         };

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Store } from './store';
+import { Store, generateId } from './store';
 import type { ProjectData } from './store';
 import JSZip from 'jszip';
 
@@ -56,7 +56,7 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
                 const parseXmindNode = (topic: any): any => {
                     const childrenArr = topic.children?.attached || topic.children || [];
                     return {
-                        id: crypto.randomUUID(),
+                        id: generateId(),
                         text: topic.title || 'Untitled',
                         children: childrenArr.map(parseXmindNode)
                     };
@@ -64,7 +64,7 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
 
                 const rootNode = parseXmindNode(sheet.rootTopic);
                 const newProject: ProjectData = {
-                    id: crypto.randomUUID(),
+                    id: generateId(),
                     name: file.name.replace('.xmind', ''),
                     updatedAt: Date.now(),
                     rootNode: rootNode
@@ -80,7 +80,7 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
 
                     if (data.id && data.rootNode) {
                         // Native app export
-                        data.id = crypto.randomUUID();
+                        data.id = generateId();
                         Store.saveProject(data);
                         loadProjects();
                     } else if (data.name || data.text || data.title) {
@@ -97,7 +97,7 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
                                 }
                             }
                             return {
-                                id: crypto.randomUUID(),
+                                id: generateId(),
                                 text: nodeText,
                                 children: Array.isArray(node.children) ? node.children.map(parseGenericNode) : []
                             };
@@ -105,7 +105,7 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
 
                         const rootNode = parseGenericNode(data);
                         const newProject: ProjectData = {
-                            id: crypto.randomUUID(),
+                            id: generateId(),
                             name: data.name || file.name.replace('.json', ''),
                             updatedAt: Date.now(),
                             rootNode: rootNode
@@ -129,20 +129,20 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
                     };
 
                     const rootData = getDepth(lines[0]) || { depth: 1, text: lines[0].replace(/^#+\s*/, '') };
-                    const rootNode: any = { id: crypto.randomUUID(), text: rootData.text || 'Imported Mind Map', children: [] };
+                    const rootNode: any = { id: generateId(), text: rootData.text || 'Imported Mind Map', children: [] };
                     const stack = [{ node: rootNode, depth: rootData.depth }];
 
                     for (let i = 1; i < lines.length; i++) {
                         const lineData = getDepth(lines[i]);
                         if (!lineData) continue;
-                        const newNode = { id: crypto.randomUUID(), text: lineData.text, children: [] };
+                        const newNode = { id: generateId(), text: lineData.text, children: [] };
                         while (stack.length > 0 && stack[stack.length - 1].depth >= lineData.depth) stack.pop();
                         if (stack.length > 0) stack[stack.length - 1].node.children.push(newNode);
                         stack.push({ node: newNode, depth: lineData.depth });
                     }
 
                     const newProject: ProjectData = {
-                        id: crypto.randomUUID(),
+                        id: generateId(),
                         name: file.name.replace('.md', ''),
                         updatedAt: Date.now(),
                         rootNode: rootNode

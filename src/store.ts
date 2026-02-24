@@ -1,3 +1,10 @@
+export const generateId = (): string => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return Date.now().toString(36) + Math.random().toString(36).substring(2, 12);
+};
+
 export type NodeData = {
   id: string;
   text: string;
@@ -44,11 +51,11 @@ export class Store {
 
   static createEmptyProject(name: string): ProjectData {
     return {
-      id: crypto.randomUUID(),
+      id: generateId(),
       name,
       updatedAt: Date.now(),
       rootNode: {
-        id: crypto.randomUUID(),
+        id: generateId(),
         text: 'Root Node',
         children: []
       }
