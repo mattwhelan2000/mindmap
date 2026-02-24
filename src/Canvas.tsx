@@ -195,8 +195,8 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
         };
     };
 
-    const handleNodeUpdate = (id: string, text: string, image?: string, width?: number) => {
-        const updatedRoot = updateNodeRec(project.rootNode, id, (n) => ({ ...n, text, image, width }));
+    const handleNodeUpdate = (id: string, text: string, image?: string, width?: number, url?: string) => {
+        const updatedRoot = updateNodeRec(project.rootNode, id, (n) => ({ ...n, text, image, width, url }));
         commitUpdate(updatedRoot);
     };
 
@@ -572,14 +572,59 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                     <input type="file" accept=".json" style={{ display: 'none' }} ref={importInputRef} onChange={handlePartialImport} />
                     <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={(e) => {
                         e.stopPropagation();
+                        let updatedRoot = project.rootNode;
+                        const targetNodeId = contextMenu.nodeId;
+                        if (targetNodeId !== project.rootNode.id) {
+                            let parentId: string | null = null;
+                            const findParent = (node: NodeData, currentParent: string | null) => {
+                                if (node.id === targetNodeId) parentId = currentParent;
+                                node.children.forEach(c => findParent(c, node.id));
+                            };
+                            findParent(project.rootNode, null);
+
+                            if (parentId) {
+                                const nodeToClone = getTopLevelSelectedNodes(project.rootNode, [targetNodeId])[0];
+                                if (nodeToClone) {
+                                    const cloneAndNewIds = (n: NodeData): NodeData => ({
+                                        ...n,
+                                        id: generateId(),
+                                        children: n.children.map(cloneAndNewIds)
+                                    });
+                                    const clonedNode = cloneAndNewIds(nodeToClone);
+                                    updatedRoot = updateNodeRec(updatedRoot, parentId, n => ({
+                                        ...n,
+                                        children: [...n.children, clonedNode]
+                                    }));
+                                    commitUpdate(updatedRoot);
+                                }
+                            }
+                        }
+                        closeContextMenu();
+                    }}>Duplicate Node</button>
+                    <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={(e) => {
+                        e.stopPropagation();
+                        const url = prompt("Enter hyperlink URL (including https://):", "https://");
+                        if (url) {
+                            const updatedIds = selectedNodeIds.length > 0 ? selectedNodeIds : [contextMenu.nodeId];
+                            let updatedRoot = project.rootNode;
+                            updatedIds.forEach(id => {
+                                updatedRoot = updateNodeRec(updatedRoot, id, n => ({ ...n, url }));
+                            });
+                            commitUpdate(updatedRoot);
+                        }
+                        closeContextMenu();
+                    }}>Add Hyperlink</button>
+                    <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={(e) => {
+                        e.stopPropagation();
                         // Add images logic
                         const updatedIds = selectedNodeIds.length > 0 ? selectedNodeIds : [contextMenu.nodeId];
                         let updatedRoot = project.rootNode;
                         updatedIds.forEach(id => {
                             const node = getTopLevelSelectedNodes(project.rootNode, [id])[0];
                             if (node) {
-                                // Basic image lookup from pollination ai with the node text
-                                const imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(node.text.substring(0, 100))}`;
+                                // Image lookup from pollination ai with the node text and random seed to prevent caching
+                                const seed = Math.floor(Math.random() * 100000);
+                                const imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(node.text.substring(0, 100))}?width=800&height=600&nologo=true&seed=${seed}`;
                                 updatedRoot = updateNodeRec(updatedRoot, id, n => ({ ...n, image: imgUrl }));
                             }
                         });

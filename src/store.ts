@@ -9,6 +9,7 @@ export type NodeData = {
   id: string;
   text: string;
   image?: string; // base64 string
+  url?: string; // hyperlink url
   isCollapsed?: boolean;
   width?: number; // Added to persist manual scaling
   children: NodeData[];

@@ -3,7 +3,7 @@ import type { NodeData } from './store';
 
 interface NodeProps {
     node: NodeData;
-    onUpdate: (id: string, text: string, image?: string, width?: number) => void;
+    onUpdate: (id: string, text: string, image?: string, width?: number, url?: string) => void;
     onAddChild: (id: string) => void;
     onDelete: (id: string) => void;
     onMoveNode: (draggedId: string, targetId: string, placement?: 'before' | 'after' | 'inside') => void;
@@ -23,7 +23,7 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
     const handleBlur = () => {
         setIsEditing(false);
         if (text !== node.text) {
-            onUpdate(node.id, text, node.image, node.width);
+            onUpdate(node.id, text, node.image, node.width, node.url);
         }
     };
 
@@ -48,14 +48,14 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
             const reader = new FileReader();
             reader.onload = (event) => {
                 const base64 = event.target?.result as string;
-                onUpdate(node.id, node.text, base64, node.width);
+                onUpdate(node.id, node.text, base64, node.width, node.url);
             };
             reader.readAsDataURL(file);
         }
     };
 
     const handleRemoveImage = () => {
-        onUpdate(node.id, node.text, undefined, node.width);
+        onUpdate(node.id, node.text, undefined, node.width, node.url);
     };
 
     const handleDragStart = (e: React.DragEvent) => {
@@ -108,7 +108,7 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
         if (nodeRef.current) {
             const currentWidth = nodeRef.current.getBoundingClientRect().width;
             if (node.width !== currentWidth) {
-                onUpdate(node.id, node.text, node.image, currentWidth);
+                onUpdate(node.id, node.text, node.image, currentWidth, node.url);
             }
         }
     };
@@ -152,9 +152,18 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
                         style={{ resize: 'none', overflow: 'hidden' }}
                     />
                 ) : (
-                    <div className="node-text" onClick={() => setIsEditing(true)}>
-                        {node.text || 'Empty node'}
-                    </div>
+                    <>
+                        <div className="node-text" onClick={() => setIsEditing(true)}>
+                            {node.text || 'Empty node'}
+                        </div>
+                        {node.url && (
+                            <div className="node-url-container" style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
+                                <a href={node.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-color)' }} onClick={e => e.stopPropagation()}>
+                                    {node.url.replace(/^https?:\/\//, '')}
+                                </a>
+                            </div>
+                        )}
+                    </>
                 )}
 
                 <div className="node-actions" onClick={e => e.stopPropagation()}>
