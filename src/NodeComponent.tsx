@@ -7,7 +7,7 @@ interface NodeProps {
     onAddChild: (id: string) => void;
     onDelete: (id: string) => void;
     onMoveNode: (draggedId: string, targetId: string, placement?: 'before' | 'after' | 'inside') => void;
-    onToggleCollapse?: (id: string, isCollapsed: boolean) => void;
+    onToggleCollapse?: (id: string, isCollapsed: boolean, recursive?: boolean) => void;
     onAddSibling?: (id: string) => void;
     selectedNodeIds?: string[];
     isRoot?: boolean;
@@ -192,9 +192,9 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
                         className="node-collapse-btn"
                         onClick={(e) => {
                             e.stopPropagation();
-                            if (onToggleCollapse) onToggleCollapse(node.id, !node.isCollapsed);
+                            if (onToggleCollapse) onToggleCollapse(node.id, !node.isCollapsed, e.shiftKey);
                         }}
-                        title={node.isCollapsed ? "Expand Node" : "Collapse Node"}
+                        title={node.isCollapsed ? "Expand Node (Shift+Click to expand all)" : "Collapse Node (Shift+Click to collapse all)"}
                     >
                         {node.isCollapsed ? '+' : '-'}
                     </button>

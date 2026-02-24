@@ -68,10 +68,8 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
     };
 
     const handleMouseDown = (e: React.MouseEvent) => {
-        if ((e.target as HTMLElement).closest('.node-input, button, .node-action-btn, .node-children')) {
-            if (!(e.target as HTMLElement).classList.contains('node-children')) {
-                return;
-            }
+        if ((e.target as HTMLElement).closest('.node-input, button, .node-action-btn')) {
+            return;
         }
 
         if (e.button === 1) { // MMB
@@ -258,11 +256,24 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
         }
     };
 
-    const handleToggleCollapse = (id: string, isCollapsed: boolean) => {
+    const handleToggleCollapse = (id: string, isCollapsed: boolean, recursive: boolean = false) => {
         const nodeEl = document.querySelector(`[data-id="${id}"]`);
         if (nodeEl) {
             const rectBefore = nodeEl.getBoundingClientRect();
-            const updatedRoot = updateNodeRec(project.rootNode, id, (n) => ({ ...n, isCollapsed }));
+
+            const performUpdate = (node: NodeData): NodeData => {
+                if (recursive) {
+                    const toggleRec = (n: NodeData): NodeData => ({
+                        ...n,
+                        isCollapsed,
+                        children: n.children.map(toggleRec)
+                    });
+                    return toggleRec({ ...node, isCollapsed });
+                }
+                return { ...node, isCollapsed };
+            };
+
+            const updatedRoot = updateNodeRec(project.rootNode, id, performUpdate);
             commitUpdate(updatedRoot);
 
             requestAnimationFrame(() => {
@@ -275,7 +286,18 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                 }
             });
         } else {
-            const updatedRoot = updateNodeRec(project.rootNode, id, (n) => ({ ...n, isCollapsed }));
+            const performUpdate = (node: NodeData): NodeData => {
+                if (recursive) {
+                    const toggleRec = (n: NodeData): NodeData => ({
+                        ...n,
+                        isCollapsed,
+                        children: n.children.map(toggleRec)
+                    });
+                    return toggleRec({ ...node, isCollapsed });
+                }
+                return { ...node, isCollapsed };
+            };
+            const updatedRoot = updateNodeRec(project.rootNode, id, performUpdate);
             commitUpdate(updatedRoot);
         }
     };
