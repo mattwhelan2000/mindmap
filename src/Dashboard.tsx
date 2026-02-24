@@ -101,6 +101,8 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
                             return {
                                 id: generateId(),
                                 text: nodeText,
+                                image: node.image || node.img || node.thumbnail,
+                                isCollapsed: !!node.isCollapsed,
                                 children: Array.isArray(node.children) ? node.children.map(parseGenericNode) : []
                             };
                         };
@@ -165,7 +167,7 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
     return (
         <div className="dashboard-container">
             <div className="dashboard-header">
-                <h1>Mindscape <span style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>v1.4</span></h1>
+                <h1>Mindscape <span style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>v1.6</span></h1>
                 <p>A simple, powerful mind mapping tool.</p>
                 <div style={{ marginTop: '1rem' }}>
                     <label className="btn-secondary" style={{ cursor: 'pointer', display: 'inline-block' }}>
