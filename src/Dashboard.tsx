@@ -11,6 +11,8 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
     const [projects, setProjects] = useState<ProjectData[]>([]);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [newProjectName, setNewProjectName] = useState('');
+    const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+    const [editTitleText, setEditTitleText] = useState('');
 
     useEffect(() => {
         loadProjects();
@@ -18,6 +20,23 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
 
     const loadProjects = () => {
         setProjects(Store.getProjects());
+    };
+
+    const handleProjectUpdate = (updatedProject: ProjectData) => {
+        Store.saveProject(updatedProject); // Assuming Store.saveProject is the correct function
+        setProjects(p => p.map(proj => proj.id === updatedProject.id ? updatedProject : proj));
+    };
+
+    const handleTitleBlur = (id: string) => {
+        if (editTitleText.trim() !== '') {
+            const project = projects.find(p => p.id === id);
+            if (project && project.name !== editTitleText.trim()) {
+                const updated = { ...project, name: editTitleText.trim(), updatedAt: Date.now() };
+                Store.saveProject(updated); // Assuming Store.saveProject is the correct function
+                setProjects(p => p.map(proj => proj.id === id ? updated : proj));
+            }
+        }
+        setEditingProjectId(null);
     };
 
     const handleCreateProject = () => {
@@ -200,7 +219,33 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
                             />
                         )}
                         <div className="project-card-header">
-                            <span className="project-card-title">{project.name}</span>
+                            {editingProjectId === project.id ? (
+                                <input
+                                    autoFocus
+                                    style={{ background: 'transparent', border: 'none', borderBottom: '1px solid var(--accent-color)', color: 'var(--text-primary)', outline: 'none', fontWeight: 600, fontSize: '1.25rem', width: '100%', marginBottom: '0.25rem' }}
+                                    value={editTitleText}
+                                    onChange={e => setEditTitleText(e.target.value)}
+                                    onBlur={() => handleTitleBlur(project.id)}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter') handleTitleBlur(project.id);
+                                        e.stopPropagation();
+                                    }}
+                                    onClick={e => e.stopPropagation()}
+                                />
+                            ) : (
+                                <span
+                                    className="project-card-title"
+                                    style={{ cursor: 'text' }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditingProjectId(project.id);
+                                        setEditTitleText(project.name);
+                                    }}
+                                    title="Click to rename"
+                                >
+                                    {project.name}
+                                </span>
+                            )}
                             <button
                                 className="btn-danger"
                                 onClick={(e) => handleDelete(e, project.id)}

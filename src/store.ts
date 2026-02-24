@@ -20,6 +20,8 @@ export type ProjectData = {
   updatedAt: number;
   rootNode: NodeData;
   thumbnail?: string;
+  canvasPosition?: { x: number, y: number };
+  canvasScale?: number;
 };
 
 export class Store {

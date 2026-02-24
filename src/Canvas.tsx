@@ -10,24 +10,57 @@ interface CanvasProps {
 }
 
 export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
-    const [scale, setScale] = useState(1);
-    const [position, setPosition] = useState({ x: window.innerWidth / 2, y: 100 });
+    const [scale, setScale] = useState(project.canvasScale ?? 1);
+    const [position, setPosition] = useState(project.canvasPosition ?? { x: window.innerWidth / 2, y: 100 });
     const [isPanning, setIsPanning] = useState(false);
     const [isZooming, setIsZooming] = useState(false);
     const [isMarquee, setIsMarquee] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
     const [marqueeEnd, setMarqueeEnd] = useState({ x: 0, y: 0 });
     const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
+    const [history, setHistory] = useState<NodeData[]>([]);
+
+    // Title Editing State
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [titleText, setTitleText] = useState(project.name);
+    const [showExportMenu, setShowExportMenu] = useState(false);
 
     const clipboardRef = useRef<NodeData[]>([]);
     const canvasRef = useRef<HTMLDivElement>(null);
 
+    const commitUpdate = (newRoot: NodeData, newTitle?: string) => {
+        setHistory(prev => [...prev.slice(-49), project.rootNode]);
+        onUpdate({ ...project, rootNode: newRoot, name: newTitle ?? project.name, updatedAt: Date.now() });
+    };
+
+    const handleTitleBlur = () => {
+        setIsEditingTitle(false);
+        if (titleText.trim() !== '' && titleText !== project.name) {
+            commitUpdate(project.rootNode, titleText.trim());
+        } else {
+            setTitleText(project.name);
+        }
+    };
+
     // Pan and Zoom logic
     const handleWheel = (e: React.WheelEvent) => {
-        // Scroll wheel should zoom
         const zoomFactor = 0.05;
         const newScale = e.deltaY < 0 ? scale + zoomFactor : scale - zoomFactor;
-        setScale(Math.min(Math.max(newScale, 0.2), 3));
+        const safeScale = Math.min(Math.max(newScale, 0.2), 3);
+
+        const canvasRect = canvasRef.current?.getBoundingClientRect();
+        if (canvasRect) {
+            const mouseX = e.clientX - canvasRect.left;
+            const mouseY = e.clientY - canvasRect.top;
+
+            const ratio = safeScale / scale;
+            const newX = mouseX - (mouseX - position.x) * ratio;
+            const newY = mouseY - (mouseY - position.y) * ratio;
+
+            setPosition({ x: newX, y: newY });
+        }
+
+        setScale(safeScale);
     };
 
     const handleMouseDown = (e: React.MouseEvent) => {
@@ -50,14 +83,20 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                 setIsMarquee(true);
                 setDragStart({ x: e.clientX, y: e.clientY });
                 setMarqueeEnd({ x: e.clientX, y: e.clientY });
-                setSelectedNodeIds([]); // click on bg clears selection
+                if (!e.shiftKey && !e.altKey) {
+                    setSelectedNodeIds([]); // click on bg clears selection unless modifying
+                }
             } else {
-                // If they click on a node directly, we could add it to selection
+                // If they click on a node directly
                 const id = (e.target as HTMLElement).closest('.node-content')?.getAttribute('data-id');
-                if (id && !e.shiftKey) {
-                    setSelectedNodeIds([id]);
-                } else if (id && e.shiftKey) {
-                    setSelectedNodeIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+                if (id) {
+                    if (e.altKey) {
+                        setSelectedNodeIds(prev => prev.filter(i => i !== id));
+                    } else if (e.shiftKey) {
+                        setSelectedNodeIds(prev => prev.includes(id) ? prev : [...prev, id]);
+                    } else {
+                        setSelectedNodeIds([id]);
+                    }
                 }
             }
         }
@@ -79,7 +118,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
         }
     };
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (e: React.MouseEvent) => {
         if (isMarquee) {
             const rect = {
                 left: Math.min(dragStart.x, marqueeEnd.x),
@@ -88,15 +127,26 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                 bottom: Math.max(dragStart.y, marqueeEnd.y)
             };
             const nodes = document.querySelectorAll('.node-content');
-            const selected: string[] = [];
+            const selectedSet = new Set(selectedNodeIds);
+
+            if (!e.shiftKey && !e.altKey) {
+                selectedSet.clear();
+            }
+
             nodes.forEach((el) => {
                 const elRect = el.getBoundingClientRect();
                 if (!(elRect.right < rect.left || elRect.left > rect.right || elRect.bottom < rect.top || elRect.top > rect.bottom)) {
                     const id = el.getAttribute('data-id');
-                    if (id) selected.push(id);
+                    if (id) {
+                        if (e.altKey) {
+                            selectedSet.delete(id);
+                        } else {
+                            selectedSet.add(id);
+                        }
+                    }
                 }
             });
-            setSelectedNodeIds(selected);
+            setSelectedNodeIds(Array.from(selectedSet));
         }
 
         setIsPanning(false);
@@ -131,7 +181,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
 
     const handleNodeUpdate = (id: string, text: string, image?: string, width?: number) => {
         const updatedRoot = updateNodeRec(project.rootNode, id, (n) => ({ ...n, text, image, width }));
-        onUpdate({ ...project, rootNode: updatedRoot, updatedAt: Date.now() });
+        commitUpdate(updatedRoot);
     };
 
     const handleAddChild = (parentId: string) => {
@@ -145,7 +195,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
             isCollapsed: false,
             children: [...n.children, newNode]
         }));
-        onUpdate({ ...project, rootNode: updatedRoot, updatedAt: Date.now() });
+        commitUpdate(updatedRoot);
     };
 
     const handleAddSibling = (targetId: string) => {
@@ -175,7 +225,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                 newChildren.splice(insertIndex + 1, 0, newNode);
                 return { ...n, children: newChildren, isCollapsed: false };
             });
-            onUpdate({ ...project, rootNode: updatedRoot, updatedAt: Date.now() });
+            commitUpdate(updatedRoot);
         }
     };
 
@@ -187,14 +237,14 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
         if (confirm('Delete this branch?')) {
             const updatedRoot = deleteNodeRec(project.rootNode, id);
             if (updatedRoot) {
-                onUpdate({ ...project, rootNode: updatedRoot, updatedAt: Date.now() });
+                commitUpdate(updatedRoot);
             }
         }
     };
 
     const handleToggleCollapse = (id: string, isCollapsed: boolean) => {
         const updatedRoot = updateNodeRec(project.rootNode, id, (n) => ({ ...n, isCollapsed }));
-        onUpdate({ ...project, rootNode: updatedRoot, updatedAt: Date.now() });
+        commitUpdate(updatedRoot);
     };
 
     const handleMoveNode = (draggedId: string, targetId: string) => {
@@ -226,7 +276,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
             children: [...n.children, draggedNode!]
         }));
 
-        onUpdate({ ...project, rootNode: updatedRoot, updatedAt: Date.now() });
+        commitUpdate(updatedRoot);
     };
 
     const getTopLevelSelectedNodes = (root: NodeData, ids: string[]): NodeData[] => {
@@ -262,7 +312,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                                 if (res) updatedRoot = res;
                             }
                         }
-                        onUpdate({ ...project, rootNode: updatedRoot, updatedAt: Date.now() });
+                        commitUpdate(updatedRoot);
                         setSelectedNodeIds([]);
                     }
                 } else if (e.key === 'v') {
@@ -270,7 +320,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                     if (clipboardRef.current.length === 0) return;
                     e.preventDefault();
 
-                    const targetId = selectedNodeIds.length === 1 ? selectedNodeIds[0] : project.rootNode.id;
+                    const targetId = selectedNodeIds.length > 0 ? selectedNodeIds[selectedNodeIds.length - 1] : project.rootNode.id;
                     const cloneAndNewIds = (n: NodeData): NodeData => ({
                         ...n,
                         id: generateId(),
@@ -283,15 +333,37 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                         children: [...n.children, ...newNodes],
                         isCollapsed: false
                     }));
-                    onUpdate({ ...project, rootNode: updatedRoot, updatedAt: Date.now() });
+                    commitUpdate(updatedRoot);
+                } else if (e.key === 'z') {
+                    // Undo
+                    e.preventDefault();
+                    if (history.length > 0) {
+                        const previousRoot = history[history.length - 1];
+                        setHistory(prev => prev.slice(0, -1));
+                        onUpdate({ ...project, rootNode: previousRoot, updatedAt: Date.now() });
+                    }
+                }
+            } else if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (selectedNodeIds.length > 0) {
+                    let updatedRoot = project.rootNode;
+                    for (const id of selectedNodeIds) {
+                        if (id !== project.rootNode.id) {
+                            const res = deleteNodeRec(updatedRoot, id);
+                            if (res) updatedRoot = res;
+                        }
+                    }
+                    if (updatedRoot !== project.rootNode) {
+                        commitUpdate(updatedRoot);
+                        setSelectedNodeIds([]);
+                    }
                 }
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedNodeIds, project.rootNode, onUpdate]);
+    }, [selectedNodeIds, project.rootNode, onUpdate, history]);
 
-    const handleExport = () => {
+    const handleExportJSON = () => {
         const jsonStr = JSON.stringify(project);
         const blob = new Blob([jsonStr], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -302,6 +374,37 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+        setShowExportMenu(false);
+    };
+
+    const exportToMarkdownRec = (node: NodeData, depth: number): string => {
+        let md = `${'#'.repeat(depth + 1)} ${node.text}\n\n`;
+        if (node.image) {
+            md += `![Image for ${node.text}](${node.image})\n\n`;
+        }
+        for (const child of node.children) {
+            md += exportToMarkdownRec(child, depth + 1);
+        }
+        return md;
+    };
+
+    const handleExportMarkdown = () => {
+        const mdContent = exportToMarkdownRec(project.rootNode, 0);
+        const blob = new Blob([mdContent], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `MindMap_${project.name.replace(/\s+/g, '_')}.md`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setShowExportMenu(false);
+    };
+
+    const handleExportPDF = () => {
+        alert("Native client-side PDF export requires external libraries like html2canvas and jsPDF to capture the DOM reliably. As a workaround until this is integrated, please hit Ctrl+P to print the webpage, and select 'Save to PDF' as the destination.");
+        setShowExportMenu(false);
     };
 
     // Ensure wheel event is non-passive to allow e.preventDefault()
@@ -314,6 +417,16 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
         el.addEventListener('wheel', preventDefaultWheel, { passive: false });
         return () => el.removeEventListener('wheel', preventDefaultWheel);
     }, []);
+
+    // Persist position and scale
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            if (project.canvasScale !== scale || project.canvasPosition?.x !== position.x || project.canvasPosition?.y !== position.y) {
+                onUpdate({ ...project, canvasScale: scale, canvasPosition: position, updatedAt: Date.now() });
+            }
+        }, 800);
+        return () => clearTimeout(timeout);
+    }, [scale, position, project, onUpdate]);
 
     return (
         <div
@@ -353,15 +466,48 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                 style={{
                     position: 'absolute', top: 20, left: 20, zIndex: 10,
                     display: 'flex', gap: '1rem', background: 'var(--bg-secondary)',
-                    padding: '0.5rem', borderRadius: '0.5rem', boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
+                    padding: '0.5rem', borderRadius: '0.5rem', boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+                    alignItems: 'center'
                 }}
             >
                 <button className="btn-secondary" onClick={onBack}>← Back</button>
-                <span style={{ fontWeight: 500, display: 'flex', alignItems: 'center' }}>{project.name}</span>
-                <button className="btn-primary" onClick={handleExport}>↓ Export JSON</button>
+                {isEditingTitle ? (
+                    <input
+                        autoFocus
+                        style={{ background: 'transparent', border: 'none', borderBottom: '1px solid var(--accent-color)', color: 'var(--text-primary)', outline: 'none', fontWeight: 500, fontSize: '1rem', width: '200px' }}
+                        value={titleText}
+                        onChange={e => setTitleText(e.target.value)}
+                        onBlur={handleTitleBlur}
+                        onKeyDown={e => { if (e.key === 'Enter') handleTitleBlur(); }}
+                    />
+                ) : (
+                    <span
+                        style={{ fontWeight: 500, cursor: 'text', padding: '0 0.5rem' }}
+                        onClick={() => setIsEditingTitle(true)}
+                        title="Click to rename"
+                    >
+                        {project.name}
+                    </span>
+                )}
+                <div style={{ position: 'relative' }}>
+                    <button className="btn-primary" onClick={() => setShowExportMenu(!showExportMenu)}>Share ▾</button>
+                    {showExportMenu && (
+                        <div style={{
+                            position: 'absolute', top: '100%', right: 0, marginTop: '0.5rem',
+                            background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
+                            borderRadius: '0.5rem', display: 'flex', flexDirection: 'column',
+                            boxShadow: '0 4px 6px rgba(0,0,0,0.3)', minWidth: '150px', zIndex: 20
+                        }}>
+                            <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={handleExportJSON}>Export JSON</button>
+                            <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={handleExportMarkdown}>Export Markdown</button>
+                            <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={handleExportPDF}>Export PDF</button>
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className="canvas-zoom-controls" style={{ position: 'absolute', bottom: 20, right: 20, zIndex: 10, display: 'flex', gap: '0.5rem', background: 'var(--bg-secondary)', padding: '0.5rem', borderRadius: '0.5rem' }}>
+                <button className="btn-secondary" onClick={() => { setScale(1); setPosition({ x: window.innerWidth / 2, y: 100 }); }} title="Re-Center">⌖</button>
                 <button className="btn-secondary" onClick={() => setScale(s => Math.max(0.2, s - 0.2))}>-</button>
                 <span style={{ display: 'flex', alignItems: 'center', width: '40px', justifyContent: 'center' }}>{Math.round(scale * 100)}%</span>
                 <button className="btn-secondary" onClick={() => setScale(s => Math.min(3, s + 0.2))}>+</button>
