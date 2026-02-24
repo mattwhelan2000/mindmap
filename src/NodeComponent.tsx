@@ -6,7 +6,7 @@ interface NodeProps {
     onUpdate: (id: string, text: string, image?: string, width?: number) => void;
     onAddChild: (id: string) => void;
     onDelete: (id: string) => void;
-    onMoveNode: (draggedId: string, targetId: string) => void;
+    onMoveNode: (draggedId: string, targetId: string, placement?: 'before' | 'after' | 'inside') => void;
     onToggleCollapse?: (id: string, isCollapsed: boolean) => void;
     onAddSibling?: (id: string) => void;
     selectedNodeIds?: string[];
@@ -16,6 +16,7 @@ interface NodeProps {
 export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, onMoveNode, onToggleCollapse, onAddSibling, selectedNodeIds, isRoot }: NodeProps) {
     const [isEditing, setIsEditing] = useState(node.text === 'New Idea');
     const [text, setText] = useState(node.text);
+    const [dragPlacement, setDragPlacement] = useState<'before' | 'after' | 'inside' | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const nodeRef = useRef<HTMLDivElement>(null);
 
@@ -69,15 +70,36 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
+
+        if (isRoot || !nodeRef.current) {
+            setDragPlacement('inside');
+            return;
+        }
+
+        const rect = nodeRef.current.getBoundingClientRect();
+        const y = e.clientY - rect.top;
+        if (y < rect.height * 0.25) {
+            setDragPlacement('before');
+        } else if (y > rect.height * 0.75) {
+            setDragPlacement('after');
+        } else {
+            setDragPlacement('inside');
+        }
+    };
+
+    const handleDragLeave = () => {
+        setDragPlacement(null);
     };
 
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        e.currentTarget.classList.remove('drag-over');
+        const placement = dragPlacement || 'inside';
+        setDragPlacement(null);
+
         const draggedId = e.dataTransfer.getData('text/plain');
         if (draggedId && draggedId !== node.id) {
-            onMoveNode(draggedId, node.id);
+            onMoveNode(draggedId, node.id, placement);
         }
     };
 
@@ -97,14 +119,19 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
                 ref={nodeRef}
                 data-id={node.id}
                 className={`node-content ${isRoot ? 'node-root' : ''} ${selectedNodeIds && selectedNodeIds.includes(node.id) ? 'node-selected' : ''}`}
+                style={{
+                    borderTop: dragPlacement === 'before' ? '3px solid var(--accent-color)' : undefined,
+                    borderBottom: dragPlacement === 'after' ? '3px solid var(--accent-color)' : undefined,
+                    outline: dragPlacement === 'inside' ? '3px solid var(--accent-color)' : undefined,
+                    width: node.width ? `${node.width}px` : undefined
+                }}
                 draggable={!isEditing && !isRoot}
                 onDragStart={handleDragStart}
                 onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 onDragEnter={e => { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }}
-                onDragLeave={e => { e.currentTarget.classList.remove('drag-over'); }}
                 onMouseUp={handleMouseUp}
-                style={{ width: node.width ? `${node.width}px` : undefined }}
             >
                 {node.image && (
                     <div className="node-image-container">

@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import type { ProjectData, NodeData } from './store';
 import { generateId } from './store';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import NodeComponent from './NodeComponent';
 
 interface CanvasProps {
@@ -19,6 +21,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
     const [marqueeEnd, setMarqueeEnd] = useState({ x: 0, y: 0 });
     const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
     const [history, setHistory] = useState<NodeData[]>([]);
+    const [contextMenu, setContextMenu] = useState<{ x: number, y: number, nodeId: string } | null>(null);
 
     // Title Editing State
     const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -26,6 +29,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
     const [showExportMenu, setShowExportMenu] = useState(false);
 
     const clipboardRef = useRef<NodeData[]>([]);
+    const importInputRef = useRef<HTMLInputElement>(null);
     const canvasRef = useRef<HTMLDivElement>(null);
 
     const commitUpdate = (newRoot: NodeData, newTitle?: string) => {
@@ -155,8 +159,20 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
     };
 
     const handleContextMenu = (e: React.MouseEvent) => {
-        e.preventDefault(); // allow RMB dragging without context menu
+        const id = (e.target as HTMLElement).closest('.node-content')?.getAttribute('data-id');
+        if (id) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!selectedNodeIds.includes(id)) {
+                setSelectedNodeIds([id]);
+            }
+            setContextMenu({ x: e.clientX, y: e.clientY, nodeId: id });
+        } else {
+            e.preventDefault(); // allow RMB dragging without context menu natively
+        }
     };
+
+    const closeContextMenu = () => setContextMenu(null);
 
     // Node operations
     const updateNodeRec = (node: NodeData, targetId: string, updater: (n: NodeData) => NodeData): NodeData => {
@@ -247,8 +263,9 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
         commitUpdate(updatedRoot);
     };
 
-    const handleMoveNode = (draggedId: string, targetId: string) => {
-        if (draggedId === targetId) return;
+    const handleMoveNode = (draggedId: string, targetId: string, placement: 'before' | 'after' | 'inside' = 'inside') => {
+        const idsToMove = selectedNodeIds.includes(draggedId) ? selectedNodeIds : [draggedId];
+        if (idsToMove.includes(targetId) || idsToMove.includes(project.rootNode.id)) return;
 
         let isDescendant = false;
         const checkDescendant = (n: NodeData) => {
@@ -256,27 +273,51 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
             n.children.forEach(checkDescendant);
         };
 
-        let draggedNode: NodeData | null = null;
+        const draggedNodes: NodeData[] = [];
         const findAndCheck = (n: NodeData) => {
-            if (n.id === draggedId) {
-                draggedNode = JSON.parse(JSON.stringify(n));
+            if (idsToMove.includes(n.id)) {
+                draggedNodes.push(JSON.parse(JSON.stringify(n)));
                 checkDescendant(n);
             }
-            if (!draggedNode) n.children.forEach(findAndCheck);
+            n.children.forEach(findAndCheck);
         };
         findAndCheck(project.rootNode);
 
-        if (isDescendant || !draggedNode) return;
+        if (isDescendant || draggedNodes.length === 0) return;
 
-        const rootAfterDelete = deleteNodeRec(project.rootNode, draggedId);
-        if (!rootAfterDelete) return;
+        let rootAfterDelete = project.rootNode;
+        for (const id of idsToMove) {
+            const res = deleteNodeRec(rootAfterDelete, id);
+            if (res) rootAfterDelete = res;
+        }
 
-        const updatedRoot = updateNodeRec(rootAfterDelete, targetId, (n) => ({
-            ...n,
-            children: [...n.children, draggedNode!]
-        }));
-
-        commitUpdate(updatedRoot);
+        if (placement === 'inside' || targetId === project.rootNode.id) {
+            const updatedRoot = updateNodeRec(rootAfterDelete, targetId, (n) => ({
+                ...n,
+                children: [...n.children, ...draggedNodes],
+                isCollapsed: false
+            }));
+            commitUpdate(updatedRoot);
+        } else {
+            const insertSiblingsRec = (node: NodeData): NodeData => {
+                if (node.children.some(c => c.id === targetId)) {
+                    const newChildren: NodeData[] = [];
+                    for (const child of node.children) {
+                        if (child.id === targetId) {
+                            if (placement === 'before') newChildren.push(...draggedNodes);
+                            newChildren.push(insertSiblingsRec(child));
+                            if (placement === 'after') newChildren.push(...draggedNodes);
+                        } else {
+                            newChildren.push(insertSiblingsRec(child));
+                        }
+                    }
+                    return { ...node, children: newChildren };
+                }
+                return { ...node, children: node.children.map(insertSiblingsRec) };
+            };
+            const updatedRoot = insertSiblingsRec(rootAfterDelete);
+            commitUpdate(updatedRoot);
+        }
     };
 
     const getTopLevelSelectedNodes = (root: NodeData, ids: string[]): NodeData[] => {
@@ -402,9 +443,78 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
         setShowExportMenu(false);
     };
 
-    const handleExportPDF = () => {
-        alert("Native client-side PDF export requires external libraries like html2canvas and jsPDF to capture the DOM reliably. As a workaround until this is integrated, please hit Ctrl+P to print the webpage, and select 'Save to PDF' as the destination.");
+    const handleExportPDF = async () => {
         setShowExportMenu(false);
+        const surfaceElem = canvasRef.current?.querySelector('.canvas-surface') as HTMLElement;
+        if (!surfaceElem) {
+            alert("Canvas surface not found.");
+            return;
+        }
+
+        try {
+            const originalTransform = surfaceElem.style.transform;
+            const originalTransition = surfaceElem.style.transition;
+
+            surfaceElem.style.transition = 'none';
+            surfaceElem.style.transform = `translate(0px, 0px) scale(1)`;
+
+            await new Promise(r => setTimeout(r, 100));
+
+            const canvas = await html2canvas(surfaceElem, {
+                backgroundColor: '#0f172a',
+                scale: 2
+            });
+
+            surfaceElem.style.transform = originalTransform;
+            surfaceElem.style.transition = originalTransition;
+
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({
+                orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+                unit: 'px',
+                format: [canvas.width, canvas.height]
+            });
+
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            pdf.save(`MindMap_${project.name.replace(/\s+/g, '_')}.pdf`);
+        } catch (error) {
+            console.error("Failed to generate PDF", error);
+            alert("Failed to export PDF.");
+        }
+    };
+
+    const handlePartialImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !contextMenu) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const data = JSON.parse(event.target?.result as string);
+
+                const cloneAndNewIds = (n: any): NodeData => ({
+                    id: generateId(),
+                    text: n.text || n.title || n.name || 'Untitled',
+                    image: n.image || n.img || n.thumbnail,
+                    isCollapsed: !!n.isCollapsed,
+                    children: Array.isArray(n.children) ? n.children.map(cloneAndNewIds) : []
+                });
+
+                const importedRootNode = data.rootNode ? cloneAndNewIds(data.rootNode) : cloneAndNewIds(data);
+
+                const updatedRoot = updateNodeRec(project.rootNode, contextMenu.nodeId, n => ({
+                    ...n,
+                    children: [...n.children, importedRootNode],
+                    isCollapsed: false
+                }));
+                commitUpdate(updatedRoot);
+            } catch (err) {
+                alert("Invalid Mind Map JSON format.");
+            }
+            closeContextMenu();
+        };
+        reader.readAsText(file);
+        e.target.value = '';
     };
 
     // Ensure wheel event is non-passive to allow e.preventDefault()
@@ -436,6 +546,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
+            onClick={closeContextMenu}
             onMouseLeave={handleMouseUp}
             onContextMenu={handleContextMenu}
             style={{
@@ -447,6 +558,53 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                 userSelect: isMarquee ? 'none' : 'auto'
             }}
         >
+            {contextMenu && (
+                <div style={{
+                    position: 'absolute', top: contextMenu.y, left: contextMenu.x, zIndex: 1000,
+                    background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
+                    borderRadius: '0.5rem', display: 'flex', flexDirection: 'column',
+                    boxShadow: '0 4px 6px rgba(0,0,0,0.3)', minWidth: '150px'
+                }}>
+                    <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={(e) => {
+                        e.stopPropagation();
+                        if (importInputRef.current) importInputRef.current.click();
+                    }}>Import JSON as Child</button>
+                    <input type="file" accept=".json" style={{ display: 'none' }} ref={importInputRef} onChange={handlePartialImport} />
+                    <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={(e) => {
+                        e.stopPropagation();
+                        // Add images logic
+                        const updatedIds = selectedNodeIds.length > 0 ? selectedNodeIds : [contextMenu.nodeId];
+                        let updatedRoot = project.rootNode;
+                        updatedIds.forEach(id => {
+                            const node = getTopLevelSelectedNodes(project.rootNode, [id])[0];
+                            if (node) {
+                                // Basic image lookup from pollination ai with the node text
+                                const imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(node.text.substring(0, 100))}`;
+                                updatedRoot = updateNodeRec(updatedRoot, id, n => ({ ...n, image: imgUrl }));
+                            }
+                        });
+                        commitUpdate(updatedRoot);
+                        closeContextMenu();
+                    }}>Add Images</button>
+                    <button className="btn-secondary" style={{ color: 'red', border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={(e) => {
+                        e.stopPropagation();
+                        // Delete logic
+                        const toDelete = selectedNodeIds.length > 0 ? selectedNodeIds : [contextMenu.nodeId];
+                        let updatedRoot = project.rootNode;
+                        for (const id of toDelete) {
+                            if (id !== project.rootNode.id) {
+                                const res = deleteNodeRec(updatedRoot, id);
+                                if (res) updatedRoot = res;
+                            }
+                        }
+                        if (updatedRoot !== project.rootNode) {
+                            commitUpdate(updatedRoot);
+                            setSelectedNodeIds([]);
+                        }
+                        closeContextMenu();
+                    }}>Delete Selected</button>
+                </div>
+            )}
             {isMarquee && (
                 <div style={{
                     position: 'absolute',
