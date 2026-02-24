@@ -114,7 +114,7 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
     };
 
     return (
-        <div className="node-wrapper">
+        <div className={`node-wrapper ${isRoot ? 'is-root' : ''}`}>
             <div
                 ref={nodeRef}
                 data-id={node.id}

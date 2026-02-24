@@ -268,20 +268,29 @@ button {
 }
 
 /* Drawing connecting lines */
-.node-children::before {
+.node-wrapper::before {
   content: '';
   position: absolute;
   top: 50%;
-  transform: translateY(-50%);
-  bottom: 0;
-  left: 0;
+  left: -3rem;
   width: 3rem;
-  height: calc(100% - 2rem);
-  border-left: 2px solid var(--border-color);
-  border-top: 2px solid var(--border-color);
-  border-bottom: 2px solid var(--border-color);
-  border-top-left-radius: 0.5rem;
-  border-bottom-left-radius: 0.5rem;
+  height: 2px;
+  background-color: var(--border-color);
+  z-index: 0;
+}
+
+.node-wrapper.is-root::before {
+  display: none;
+}
+
+.node-children::before {
+  content: '';
+  position: absolute;
+  top: 2rem;
+  bottom: 2rem;
+  left: 0;
+  width: 2px;
+  background-color: var(--border-color);
   z-index: 0;
 }
 
@@ -304,8 +313,9 @@ button {
 }
 
 .node-selected {
-  border-color: var(--accent-color);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4);
+  border-color: #60a5fa;
+  box-shadow: 0 0 15px 4px rgba(59, 130, 246, 0.6);
+  border-width: 2px;
 }
 
 .node-content:hover {

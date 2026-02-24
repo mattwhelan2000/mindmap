@@ -11,6 +11,7 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
     const [projects, setProjects] = useState<ProjectData[]>([]);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [newProjectName, setNewProjectName] = useState('');
+    const [newBgColor, setNewBgColor] = useState('#242424');
     const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
     const [editTitleText, setEditTitleText] = useState('');
 
@@ -36,10 +37,11 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
 
     const handleCreateProject = () => {
         if (!newProjectName.trim()) return;
-        const project = Store.createEmptyProject(newProjectName);
+        const project = Store.createEmptyProject(newProjectName, newBgColor);
         Store.saveProject(project);
         setShowCreateModal(false);
         setNewProjectName('');
+        setNewBgColor('#242424');
         onOpenProject(project); // Open immediately
     };
 
@@ -181,7 +183,7 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
     return (
         <div className="dashboard-container">
             <div className="dashboard-header">
-                <h1>Mindscape <span style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>v1.8</span></h1>
+                <h1>Mindscape <span style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>v2.0</span></h1>
                 <p>A simple, powerful mind mapping tool.</p>
                 <div style={{ marginTop: '1rem' }}>
                     <label className="btn-secondary" style={{ cursor: 'pointer', display: 'inline-block' }}>
@@ -293,6 +295,15 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
                                 if (e.key === 'Escape') setShowCreateModal(false);
                             }}
                         />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
+                            <label style={{ color: 'var(--text-primary)' }}>Background Color:</label>
+                            <input
+                                type="color"
+                                value={newBgColor}
+                                onChange={e => setNewBgColor(e.target.value)}
+                                style={{ cursor: 'pointer', background: 'transparent', border: 'none', width: '40px', height: '40px' }}
+                            />
+                        </div>
                         <div className="modal-actions">
                             <button className="btn-secondary" onClick={() => setShowCreateModal(false)}>Cancel</button>
                             <button className="btn-primary" onClick={handleCreateProject}>Create</button>

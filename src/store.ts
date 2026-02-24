@@ -23,6 +23,7 @@ export type ProjectData = {
   thumbnail?: string;
   canvasPosition?: { x: number, y: number };
   canvasScale?: number;
+  backgroundColor?: string;
 };
 
 export class Store {
@@ -54,11 +55,12 @@ export class Store {
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(projects));
   }
 
-  static createEmptyProject(name: string): ProjectData {
+  static createEmptyProject(name: string, backgroundColor: string = '#242424'): ProjectData {
     return {
       id: generateId(),
       name,
       updatedAt: Date.now(),
+      backgroundColor,
       rootNode: {
         id: generateId(),
         text: 'Root Node',

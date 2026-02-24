@@ -697,7 +697,8 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                 overflow: 'hidden',
                 position: 'relative',
                 cursor: isPanning ? 'grabbing' : isZooming ? 'ns-resize' : 'default',
-                userSelect: isMarquee ? 'none' : 'auto'
+                userSelect: isMarquee ? 'none' : 'auto',
+                backgroundColor: project.backgroundColor || 'var(--bg-primary)'
             }}
         >
             {contextMenu && (
