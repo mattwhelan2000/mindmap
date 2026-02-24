@@ -203,21 +203,35 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
     };
 
     const handleNodeUpdate = (id: string, text: string, image?: string, width?: number, url?: string) => {
-        const updatedRoot = updateNodeRec(project.rootNode, id, (n) => ({ ...n, text, image, width, url }));
+        const updatedRoot = updateNodeRec(project.rootNode, id, (n) => {
+            if (width !== undefined && width !== n.width) {
+                const cascadeWidth = (node: NodeData): NodeData => ({
+                    ...node,
+                    width,
+                    children: node.children.map(cascadeWidth)
+                });
+                const cascadedNode = cascadeWidth(n);
+                return { ...cascadedNode, text, image, url };
+            }
+            return { ...n, text, image, width, url };
+        });
         commitUpdate(updatedRoot);
     };
 
     const handleAddChild = (parentId: string) => {
-        const newNode: NodeData = {
-            id: generateId(),
-            text: 'New Idea',
-            children: []
-        };
-        const updatedRoot = updateNodeRec(project.rootNode, parentId, (n) => ({
-            ...n,
-            isCollapsed: false,
-            children: [...n.children, newNode]
-        }));
+        const updatedRoot = updateNodeRec(project.rootNode, parentId, (n) => {
+            const newNode: NodeData = {
+                id: generateId(),
+                text: 'New Idea',
+                width: n.width,
+                children: []
+            };
+            return {
+                ...n,
+                isCollapsed: false,
+                children: [...n.children, newNode]
+            };
+        });
         commitUpdate(updatedRoot);
     };
 
@@ -238,12 +252,14 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
         findParent(project.rootNode, targetId);
 
         if (parentId && insertIndex !== -1) {
-            const newNode: NodeData = {
-                id: generateId(),
-                text: 'New Idea',
-                children: []
-            };
             const updatedRoot = updateNodeRec(project.rootNode, parentId, (n) => {
+                const siblingWidth = n.children[insertIndex]?.width;
+                const newNode: NodeData = {
+                    id: generateId(),
+                    text: 'New Idea',
+                    width: siblingWidth,
+                    children: []
+                };
                 const newChildren = [...n.children];
                 newChildren.splice(insertIndex + 1, 0, newNode);
                 return { ...n, children: newChildren, isCollapsed: false };
