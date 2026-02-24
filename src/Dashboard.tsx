@@ -87,7 +87,15 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
                         // Generic JSON tree (like the user's example)
                         const parseGenericNode = (node: any): any => {
                             let nodeText = node.name || node.text || node.title || 'Untitled';
-                            if (node.description) nodeText += `\n(${node.description})`;
+                            if (node.description) nodeText += `\n\n${node.description}`;
+                            if (node.theme) nodeText += `\n\nTheme: ${node.theme}`;
+                            if (node.script) nodeText += `\n\nScript: ${node.script}`;
+                            if (node.synopsis && typeof node.synopsis === 'object') {
+                                nodeText += `\n\nSynopsis:`;
+                                for (const [key, value] of Object.entries(node.synopsis)) {
+                                    nodeText += `\n• ${key}: ${value}`;
+                                }
+                            }
                             return {
                                 id: crypto.randomUUID(),
                                 text: nodeText,
