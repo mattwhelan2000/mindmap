@@ -153,7 +153,7 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
     return (
         <div className="dashboard-container">
             <div className="dashboard-header">
-                <h1>Mindscape</h1>
+                <h1>Mindscape <span style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>v1.1</span></h1>
                 <p>A simple, powerful mind mapping tool.</p>
                 <div style={{ marginTop: '1rem' }}>
                     <label className="btn-secondary" style={{ cursor: 'pointer', display: 'inline-block' }}>
@@ -178,6 +178,13 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
                         className="project-card"
                         onClick={() => onOpenProject(project)}
                     >
+                        {project.thumbnail && (
+                            <img
+                                src={project.thumbnail}
+                                alt="Cover"
+                                style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '0.5rem', marginBottom: '1rem' }}
+                            />
+                        )}
                         <div className="project-card-header">
                             <span className="project-card-title">{project.name}</span>
                             <button
@@ -188,8 +195,30 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
                                 ✕
                             </button>
                         </div>
-                        <div className="project-card-meta">
-                            Last updated: {new Date(project.updatedAt).toLocaleDateString()}
+                        <div className="project-card-meta" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span>Last updated: {new Date(project.updatedAt).toLocaleDateString()}</span>
+                            <label onClick={e => e.stopPropagation()} style={{ cursor: 'pointer', color: 'var(--accent-color)', fontSize: '0.875rem' }}>
+                                Add Image
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    style={{ display: 'none' }}
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            const reader = new FileReader();
+                                            reader.onload = (event) => {
+                                                const base64 = event.target?.result as string;
+                                                const updated = { ...project, thumbnail: base64 };
+                                                Store.saveProject(updated);
+                                                loadProjects();
+                                            };
+                                            reader.readAsDataURL(file);
+                                        }
+                                        e.target.value = '';
+                                    }}
+                                />
+                            </label>
                         </div>
                     </div>
                 ))}

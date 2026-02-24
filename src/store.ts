@@ -10,6 +10,7 @@ export type ProjectData = {
   name: string;
   updatedAt: number;
   rootNode: NodeData;
+  thumbnail?: string;
 };
 
 export class Store {
