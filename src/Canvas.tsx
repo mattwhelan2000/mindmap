@@ -28,6 +28,9 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
     const [titleText, setTitleText] = useState(project.name);
     const [showExportMenu, setShowExportMenu] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isPresenting, setIsPresenting] = useState(false);
+    const [showControls, setShowControls] = useState(false);
 
     useEffect(() => {
         const handleFullscreenChange = () => {
@@ -203,6 +206,23 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
     };
 
     const handleNodeUpdate = (id: string, text: string, image?: string, width?: number, url?: string, singleNodeResize: boolean = false) => {
+        let isWidthChanged = false;
+        const checkChanged = (n: NodeData) => {
+            if (n.id === id && n.width !== width) isWidthChanged = true;
+            n.children.forEach(checkChanged);
+        };
+        checkChanged(project.rootNode);
+
+        if (width !== undefined && isWidthChanged && selectedNodeIds.includes(id) && selectedNodeIds.length > 1) {
+            let updatedRoot = project.rootNode;
+            for (const selectedId of selectedNodeIds) {
+                updatedRoot = updateNodeRec(updatedRoot, selectedId, n => ({ ...n, width }));
+            }
+            updatedRoot = updateNodeRec(updatedRoot, id, n => ({ ...n, text, image, url }));
+            commitUpdate(updatedRoot);
+            return;
+        }
+
         const cascadeWidth = (node: NodeData): NodeData => ({
             ...node,
             width,
@@ -566,6 +586,16 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                         setSelectedNodeIds([]);
                     }
                 }
+            } else if (e.key === 'Tab') {
+                e.preventDefault();
+                if (selectedNodeIds.length === 1) {
+                    handleAddChild(selectedNodeIds[0]);
+                }
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (selectedNodeIds.length === 1) {
+                    handleAddSibling(selectedNodeIds[0]);
+                }
             }
         };
         window.addEventListener('keydown', handleKeyDown);
@@ -708,7 +738,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
 
     return (
         <div
-            className="canvas-container canvas-background"
+            className={`canvas-container canvas-background layout-${project.layoutDirection || 'horizontal'} ${isPresenting ? 'presentation-mode' : ''}`}
             ref={canvasRef}
             onWheel={handleWheel}
             onMouseDown={handleMouseDown}
@@ -739,6 +769,56 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                         if (importInputRef.current) importInputRef.current.click();
                     }}>Import JSON as Child</button>
                     <input type="file" accept=".json" style={{ display: 'none' }} ref={importInputRef} onChange={handlePartialImport} />
+
+                    {/* Styling Controls */}
+                    <div style={{ padding: '0.5rem 1rem', display: 'flex', gap: '4px', borderTop: '1px solid var(--border-color)' }}>
+                        {['transparent', '#7f1d1d', '#14532d', '#1e3a8a', '#713f12'].map(color => (
+                            <button
+                                key={color}
+                                style={{
+                                    width: '20px', height: '20px', borderRadius: '50%',
+                                    border: '1px solid var(--text-primary)', background: color, cursor: 'pointer'
+                                }}
+                                title={color === 'transparent' ? 'Clear Color' : `Set color ${color}`}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    const updatedIds = selectedNodeIds.length > 0 ? selectedNodeIds : [contextMenu.nodeId];
+                                    let updatedRoot = project.rootNode;
+                                    updatedIds.forEach(id => {
+                                        updatedRoot = updateNodeRec(updatedRoot, id, n => ({ ...n, backgroundColor: color === 'transparent' ? undefined : color }));
+                                    });
+                                    commitUpdate(updatedRoot);
+                                    closeContextMenu();
+                                }}
+                            />
+                        ))}
+                    </div>
+
+                    {/* Icon Controls */}
+                    <div style={{ padding: '0.25rem 1rem 0.5rem 1rem', display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-color)' }}>
+                        {['', '⚠️', '📌', '✔️', '💡'].map(icon => (
+                            <button
+                                key={icon}
+                                style={{
+                                    border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '1.2rem', padding: 0
+                                }}
+                                title={icon === '' ? 'Clear Icon' : `Add ${icon}`}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    const updatedIds = selectedNodeIds.length > 0 ? selectedNodeIds : [contextMenu.nodeId];
+                                    let updatedRoot = project.rootNode;
+                                    updatedIds.forEach(id => {
+                                        updatedRoot = updateNodeRec(updatedRoot, id, n => ({ ...n, icon: icon === '' ? undefined : icon }));
+                                    });
+                                    commitUpdate(updatedRoot);
+                                    closeContextMenu();
+                                }}
+                            >
+                                {icon || '✖'}
+                            </button>
+                        ))}
+                    </div>
+
                     <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={(e) => {
                         e.stopPropagation();
                         let updatedRoot = project.rootNode;
@@ -833,63 +913,192 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                 }} />
             )}
 
-            <div
-                className="canvas-toolbar"
-                style={{
-                    position: 'absolute', top: 20, left: 20, zIndex: 10,
-                    display: 'flex', gap: '1rem', background: 'var(--bg-secondary)',
-                    padding: '0.5rem', borderRadius: '0.5rem', boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
-                    alignItems: 'center'
-                }}
-            >
-                <button className="btn-secondary" onClick={onBack}>← Back</button>
-                {isEditingTitle ? (
-                    <input
-                        autoFocus
-                        style={{ background: 'transparent', border: 'none', borderBottom: '1px solid var(--accent-color)', color: 'var(--text-primary)', outline: 'none', fontWeight: 500, fontSize: '1rem', width: '200px' }}
-                        value={titleText}
-                        onChange={e => setTitleText(e.target.value)}
-                        onBlur={handleTitleBlur}
-                        onKeyDown={e => { if (e.key === 'Enter') handleTitleBlur(); }}
-                    />
-                ) : (
-                    <span
-                        style={{ fontWeight: 500, cursor: 'text', padding: '0 0.5rem' }}
-                        onClick={() => setIsEditingTitle(true)}
-                        title="Click to rename"
-                    >
-                        {project.name}
-                    </span>
-                )}
+            {isPresenting && (
+                <button
+                    className="btn-primary"
+                    style={{
+                        position: 'absolute', top: 20, right: 20, zIndex: 100,
+                        padding: '0.75rem 1.5rem', borderRadius: '2rem',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                        fontSize: '1.1rem', fontWeight: 600
+                    }}
+                    onClick={() => setIsPresenting(false)}
+                >
+                    Exit Presentation
+                </button>
+            )}
 
-                <button className="btn-secondary" onClick={handleExpandAll} title="Expand All Nodes">↧ Expand All</button>
-                <button className="btn-secondary" onClick={handleContractAll} title="Contract All Nodes">↥ Contract All</button>
-
-                <div style={{ position: 'relative' }}>
-                    <button className="btn-primary" onClick={() => setShowExportMenu(!showExportMenu)}>Share ▾</button>
-                    {showExportMenu && (
-                        <div style={{
-                            position: 'absolute', top: '100%', right: 0, marginTop: '0.5rem',
-                            background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
-                            borderRadius: '0.5rem', display: 'flex', flexDirection: 'column',
-                            boxShadow: '0 4px 6px rgba(0,0,0,0.3)', minWidth: '150px', zIndex: 20
-                        }}>
-                            <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={handleExportJSON}>Export JSON</button>
-                            <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={handleExportMarkdown}>Export Markdown</button>
-                            <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={handleExportPDF}>Export PDF</button>
-                        </div>
+            {!isPresenting && (
+                <div
+                    className="canvas-toolbar"
+                    style={{
+                        position: 'absolute', top: 20, left: 20, zIndex: 10,
+                        display: 'flex', gap: '1rem', background: 'var(--bg-secondary)',
+                        padding: '0.5rem', borderRadius: '0.5rem', boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+                        alignItems: 'center'
+                    }}
+                >
+                    <button className="btn-secondary" onClick={onBack}>← Back</button>
+                    {isEditingTitle ? (
+                        <input
+                            autoFocus
+                            style={{ background: 'transparent', border: 'none', borderBottom: '1px solid var(--accent-color)', color: 'var(--text-primary)', outline: 'none', fontWeight: 500, fontSize: '1rem', width: '200px' }}
+                            value={titleText}
+                            onChange={e => setTitleText(e.target.value)}
+                            onBlur={handleTitleBlur}
+                            onKeyDown={e => { if (e.key === 'Enter') handleTitleBlur(); }}
+                        />
+                    ) : (
+                        <span
+                            style={{ fontWeight: 500, cursor: 'text', padding: '0 0.5rem' }}
+                            onClick={() => setIsEditingTitle(true)}
+                            title="Click to rename"
+                        >
+                            {project.name}
+                        </span>
                     )}
-                </div>
-            </div>
 
-            <div className="canvas-zoom-controls" style={{ position: 'absolute', bottom: 20, right: 20, zIndex: 10, display: 'flex', gap: '0.5rem', background: 'var(--bg-secondary)', padding: '0.5rem', borderRadius: '0.5rem' }}>
-                <button className="btn-secondary" onClick={handleFullscreen} title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}>{isFullscreen ? '⤡' : '⤢'}</button>
-                <button className="btn-secondary" onClick={handleCenterNode} title="Re-Center on Root Node">⌖</button>
-                <button className="btn-secondary" onClick={handleFrameAll} title="Frame Entire Tree">[ ]</button>
-                <button className="btn-secondary" onClick={() => setScale(s => Math.max(0.2, s - 0.2))}>-</button>
-                <span style={{ display: 'flex', alignItems: 'center', width: '40px', justifyContent: 'center' }}>{Math.round(scale * 100)}%</span>
-                <button className="btn-secondary" onClick={() => setScale(s => Math.min(3, s + 0.2))}>+</button>
-            </div>
+                    {/* Search Input */}
+                    <div style={{ position: 'relative', marginLeft: '1rem', display: 'flex', alignItems: 'center' }}>
+                        <span style={{ position: 'absolute', left: '8px', opacity: 0.5, pointerEvents: 'none' }}>🔍</span>
+                        <input
+                            type="text"
+                            placeholder="Search map..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            style={{
+                                background: 'var(--bg-primary)',
+                                border: '1px solid var(--border-color)',
+                                color: 'var(--text-primary)',
+                                padding: '0.25rem 0.5rem 0.25rem 1.75rem',
+                                borderRadius: '0.25rem',
+                                outline: 'none',
+                                width: '150px',
+                                transition: 'width 0.2s, border-color 0.2s'
+                            }}
+                            onFocus={(e) => e.target.style.width = '200px'}
+                            onBlur={(e) => {
+                                if (!searchQuery) e.target.style.width = '150px';
+                            }}
+                        />
+                        {searchQuery && (
+                            <button
+                                onClick={() => setSearchQuery('')}
+                                style={{ position: 'absolute', right: '4px', background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', opacity: 0.5 }}
+                            >
+                                ×
+                            </button>
+                        )}
+                    </div>
+
+                    <div style={{ flex: 1 }} /> {/* Spacer */}
+
+                    <button className="btn-secondary" onClick={handleExpandAll} title="Expand All Nodes">↧ Expand All</button>
+                    <button className="btn-secondary" onClick={handleContractAll} title="Contract All Nodes">↥ Contract All</button>
+
+                    <button
+                        className="btn-secondary"
+                        onClick={() => onUpdate({ ...project, layoutDirection: project.layoutDirection === 'vertical' ? 'horizontal' : 'vertical' })}
+                        title={`Switch to ${project.layoutDirection === 'vertical' ? 'Horizontal' : 'Vertical'} Layout`}
+                    >
+                        {project.layoutDirection === 'vertical' ? '→ Horizontal' : '↓ Vertical'}
+                    </button>
+
+                    <button
+                        className="btn-primary"
+                        onClick={() => setIsPresenting(true)}
+                        title="Enter full-screen distraction free presentation mode"
+                    >
+                        ▶ Present
+                    </button>
+
+                    <div style={{ position: 'relative' }}>
+                        <button className="btn-primary" onClick={() => setShowExportMenu(!showExportMenu)}>Share ▾</button>
+                        {showExportMenu && (
+                            <div style={{
+                                position: 'absolute', top: '100%', right: 0, marginTop: '0.5rem',
+                                background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
+                                borderRadius: '0.5rem', display: 'flex', flexDirection: 'column',
+                                boxShadow: '0 4px 6px rgba(0,0,0,0.3)', minWidth: '150px', zIndex: 20
+                            }}>
+                                <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={handleExportJSON}>Export JSON</button>
+                                <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={handleExportMarkdown}>Export Markdown</button>
+                                <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={handleExportPDF}>Export PDF</button>
+                            </div>
+                        )}
+                    </div>
+
+                    <button className="btn-secondary" onClick={() => setShowControls(true)}>? Controls</button>
+                </div>
+            )}
+
+            {!isPresenting && (
+                <div className="canvas-zoom-controls" style={{ position: 'absolute', bottom: 20, right: 20, zIndex: 10, display: 'flex', gap: '0.5rem', background: 'var(--bg-secondary)', padding: '0.5rem', borderRadius: '0.5rem' }}>
+                    <button className="btn-secondary" onClick={handleFullscreen} title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}>{isFullscreen ? '⤡' : '⤢'}</button>
+                    <button className="btn-secondary" onClick={handleCenterNode} title="Re-Center on Root Node">⌖</button>
+                    <button className="btn-secondary" onClick={handleFrameAll} title="Frame Entire Tree">[ ]</button>
+                    <button className="btn-secondary" onClick={() => setScale(s => Math.max(0.2, s - 0.2))}>-</button>
+                    <span style={{ display: 'flex', alignItems: 'center', width: '40px', justifyContent: 'center' }}>{Math.round(scale * 100)}%</span>
+                    <button className="btn-secondary" onClick={() => setScale(s => Math.min(3, s + 0.2))}>+</button>
+                </div>
+            )}
+
+            {/* Minimap (Radar View) */}
+            {!isPresenting && (
+                <div
+                    className="minimap-container"
+                    style={{
+                        position: 'absolute',
+                        left: 20,
+                        bottom: 20,
+                        width: '200px',
+                        height: '150px',
+                        background: 'var(--bg-secondary)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+                        overflow: 'hidden',
+                        zIndex: 10,
+                        pointerEvents: 'none' // For now, non-interactive visual only
+                    }}
+                >
+                    <div
+                        className="minimap-surface layout-horizontal" // Force horizontal minimap styling regardless of main layout so it fits box better, or match it
+                        style={{
+                            position: 'absolute',
+                            transform: `translate(${200 / 2 + (position.x * 0.05)}px, ${150 / 2 + (position.y * 0.05)}px) scale(${scale * 0.05})`,
+                            transformOrigin: '0 0',
+                            transition: isPanning ? 'none' : 'transform 0.1s ease-out'
+                        }}
+                    >
+                        <NodeComponent
+                            node={project.rootNode}
+                            onUpdate={() => { }}
+                            onAddChild={() => { }}
+                            onDelete={() => { }}
+                            onMoveNode={() => { }}
+                            selectedNodeIds={[]}
+                            isRoot={true}
+                            searchQuery={searchQuery}
+                        />
+                    </div>
+                    {/* Viewport Box */}
+                    <div
+                        style={{
+                            position: 'absolute',
+                            border: '1px solid var(--accent-color)',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            left: 200 / 2 - ((window.innerWidth / 2) * 0.05),
+                            top: 150 / 2 - ((window.innerHeight / 2) * 0.05),
+                            width: window.innerWidth * 0.05,
+                            height: window.innerHeight * 0.05,
+                            boxShadow: '0 0 0 9999px rgba(0,0,0,0.4)', // Darkens everything outside viewport
+                            transform: `translate(${-(position.x - window.innerWidth / 2) * 0.05}px, ${-(position.y - window.innerHeight / 2) * 0.05}px) scale(${1 / scale})`,
+                            transformOrigin: 'center center'
+                        }}
+                    />
+                </div>
+            )}
 
             <div
                 className="canvas-surface canvas-background"
@@ -912,8 +1121,69 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                     onAddSibling={handleAddSibling}
                     selectedNodeIds={selectedNodeIds}
                     isRoot={true}
+                    searchQuery={searchQuery}
                 />
             </div>
+
+            {/* Controls Modal */}
+            {showControls && (
+                <div style={{
+                    position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+                    backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }} onClick={() => setShowControls(false)}>
+                    <div className="controls-modal" style={{
+                        background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem',
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.5)', maxWidth: '500px', width: '90%'
+                    }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                            <h2 style={{ margin: 0 }}>Controls & Shortcuts</h2>
+                            <button style={{ background: 'transparent', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-primary)' }} onClick={() => setShowControls(false)}>×</button>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '0.5rem', fontSize: '0.95rem' }}>
+                            <strong style={{ color: 'var(--accent-color)' }}>Select Node</strong>
+                            <span>Click on node text</span>
+
+                            <strong style={{ color: 'var(--accent-color)' }}>Edit Node Text</strong>
+                            <span>Double-click node text</span>
+
+                            <strong style={{ color: 'var(--accent-color)' }}>Rich Text</strong>
+                            <span>Use standard Markdown (e.g. `**bold**`, `- list`) in node text</span>
+
+                            <strong style={{ color: 'var(--accent-color)' }}>Add Child</strong>
+                            <span>Select node + <code>Tab</code></span>
+
+                            <strong style={{ color: 'var(--accent-color)' }}>Add Sibling</strong>
+                            <span>Select node + <code>Enter</code></span>
+
+                            <strong style={{ color: 'var(--accent-color)' }}>Move Node</strong>
+                            <span>Click and drag a node onto another node</span>
+
+                            <strong style={{ color: 'var(--accent-color)' }}>Delete Node</strong>
+                            <span>Select node + <code>Delete</code> / <code>Backspace</code></span>
+
+                            <strong style={{ color: 'var(--accent-color)' }}>Multi-Select</strong>
+                            <span><code>Shift</code> + Click, or Marquee drag on canvas</span>
+
+                            <strong style={{ color: 'var(--accent-color)' }}>Pan Canvas</strong>
+                            <span>Click and drag on empty background space</span>
+
+                            <strong style={{ color: 'var(--accent-color)' }}>Zoom Canvas</strong>
+                            <span>Scroll wheel</span>
+
+                            <strong style={{ color: 'var(--accent-color)' }}>Resize Node</strong>
+                            <span>Drag bottom-right handle. Resizes all children by default.</span>
+
+                            <strong style={{ color: 'var(--accent-color)' }}>Independent Resize</strong>
+                            <span><code>Alt</code> + Drag resize handle (Resizes only that node)</span>
+
+                            <strong style={{ color: 'var(--accent-color)' }}>ContextMenu / Colors</strong>
+                            <span>Right-click any node</span>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

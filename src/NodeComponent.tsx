@@ -1,4 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { NodeData } from './store';
 
 interface NodeProps {
@@ -11,14 +13,69 @@ interface NodeProps {
     onAddSibling?: (id: string) => void;
     selectedNodeIds?: string[];
     isRoot?: boolean;
+    level?: number;
+    searchQuery?: string;
 }
 
-export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, onMoveNode, onToggleCollapse, onAddSibling, selectedNodeIds, isRoot }: NodeProps) {
+export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, onMoveNode, onToggleCollapse, onAddSibling, selectedNodeIds, isRoot, level = 0, searchQuery }: NodeProps) {
     const [isEditing, setIsEditing] = useState(node.text === 'New Idea');
     const [text, setText] = useState(node.text);
     const [dragPlacement, setDragPlacement] = useState<'before' | 'after' | 'inside' | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const nodeRef = useRef<HTMLDivElement>(null);
+    const isResizingRef = useRef(false);
+    const startWidthRef = useRef<number | null>(null);
+    const startXRef = useRef<number | null>(null);
+    const currentWidthRef = useRef<number | null>(null);
+
+    useEffect(() => {
+        const handleGlobalMouseMove = (e: MouseEvent) => {
+            if (!isResizingRef.current || !nodeRef.current || startXRef.current === null || startWidthRef.current === null) return;
+
+            const deltaX = e.clientX - startXRef.current;
+            const newWidth = Math.max(150, startWidthRef.current + deltaX); // Min width 150
+            nodeRef.current.style.width = `${newWidth}px`;
+            currentWidthRef.current = newWidth;
+        };
+
+        const handleGlobalMouseUp = (e: MouseEvent) => {
+            if (isResizingRef.current) {
+                isResizingRef.current = false;
+                if (currentWidthRef.current !== null && startWidthRef.current !== currentWidthRef.current) {
+                    const finalWidth = Math.round(currentWidthRef.current);
+                    onUpdate(node.id, node.text, node.image, finalWidth, node.url, e.altKey);
+                }
+            }
+        };
+
+        if (isResizingRef.current) {
+            window.addEventListener('mousemove', handleGlobalMouseMove);
+            window.addEventListener('mouseup', handleGlobalMouseUp);
+        }
+
+        return () => {
+            window.removeEventListener('mousemove', handleGlobalMouseMove);
+            window.removeEventListener('mouseup', handleGlobalMouseUp);
+        };
+    }, [node.id, node.text, node.image, node.url, onUpdate]);
+
+    const handleResizeMouseDown = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (nodeRef.current) {
+            startWidthRef.current = nodeRef.current.getBoundingClientRect().width;
+            startXRef.current = e.clientX;
+            currentWidthRef.current = startWidthRef.current;
+            isResizingRef.current = true;
+
+            // Force re-render to attach window listeners
+            setIsEditing(prev => prev);
+        }
+    };
+
+    const isSearchMatch = searchQuery && searchQuery.trim() !== '' && node.text.toLowerCase().includes(searchQuery.toLowerCase());
+    const isSearchActive = searchQuery && searchQuery.trim() !== '';
+    const searchClass = isSearchActive ? (isSearchMatch ? 'search-match' : 'search-fade') : '';
 
     const handleBlur = () => {
         setIsEditing(false);
@@ -103,27 +160,20 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
         }
     };
 
-    const handleMouseUp = (e: React.MouseEvent) => {
-        // If the user manually resizes using CSS, the width on the ref changes
-        if (nodeRef.current) {
-            const currentWidth = nodeRef.current.getBoundingClientRect().width;
-            if (node.width !== currentWidth) {
-                onUpdate(node.id, node.text, node.image, currentWidth, node.url, e.altKey);
-            }
-        }
-    };
+
 
     return (
-        <div className={`node-wrapper ${isRoot ? 'is-root' : ''}`}>
+        <div className={`node-wrapper level-${level} ${isRoot ? 'is-root' : ''} ${searchClass}`}>
             <div
                 ref={nodeRef}
                 data-id={node.id}
-                className={`node-content ${isRoot ? 'node-root' : ''} ${selectedNodeIds && selectedNodeIds.includes(node.id) ? 'node-selected' : ''}`}
+                className={`node-content level-${level} ${isRoot ? 'node-root' : ''} ${selectedNodeIds && selectedNodeIds.includes(node.id) ? 'node-selected' : ''}`}
                 style={{
                     borderTop: dragPlacement === 'before' ? '3px solid var(--accent-color)' : undefined,
                     borderBottom: dragPlacement === 'after' ? '3px solid var(--accent-color)' : undefined,
                     outline: dragPlacement === 'inside' ? '3px solid var(--accent-color)' : undefined,
-                    width: node.width ? `${node.width}px` : undefined
+                    width: node.width ? `${node.width}px` : undefined,
+                    backgroundColor: node.backgroundColor ? node.backgroundColor : undefined
                 }}
                 draggable={!isEditing && !isRoot}
                 onDragStart={handleDragStart}
@@ -131,8 +181,13 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 onDragEnter={e => { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }}
-                onMouseUp={handleMouseUp}
             >
+                {/* Custom Resize Handle */}
+                <div
+                    className="custom-resize-handle"
+                    onMouseDown={handleResizeMouseDown}
+                    title="Drag to resize (Hold Alt to resize only this node)"
+                />
                 {node.image && (
                     <div className="node-image-container">
                         <img src={node.image} alt="Node attachment" className="node-image" />
@@ -148,13 +203,16 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
                         onChange={e => setText(e.target.value)}
                         onBlur={handleBlur}
                         onKeyDown={handleKeyDown}
-                        rows={text.split('\n').length}
+                        rows={text.split('\n').length || 1}
                         style={{ resize: 'none', overflow: 'hidden' }}
                     />
                 ) : (
                     <>
-                        <div className="node-text" onClick={() => setIsEditing(true)}>
-                            {node.text || 'Empty node'}
+                        <div className="node-text" onClick={() => setIsEditing(true)} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                            {node.icon && <span style={{ fontSize: '1.2em', lineHeight: '1.2' }}>{node.icon}</span>}
+                            <div className="markdown-body" style={{ flex: 1, minWidth: 0, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{node.text || 'Empty node'}</ReactMarkdown>
+                            </div>
                         </div>
                         {node.url && (
                             <div className="node-url-container" style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
@@ -202,7 +260,7 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
             </div>
 
             {!node.isCollapsed && node.children && node.children.length > 0 && (
-                <div className="node-children">
+                <div className={`node-children level-${level}-children`}>
                     {node.children.map(child => (
                         <NodeComponent
                             key={child.id}
@@ -214,6 +272,8 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
                             onToggleCollapse={onToggleCollapse}
                             onAddSibling={onAddSibling}
                             selectedNodeIds={selectedNodeIds}
+                            level={level + 1}
+                            searchQuery={searchQuery}
                         />
                     ))}
                 </div>

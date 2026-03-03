@@ -12,6 +12,8 @@ export type NodeData = {
   url?: string; // hyperlink url
   isCollapsed?: boolean;
   width?: number; // Added to persist manual scaling
+  backgroundColor?: string;
+  icon?: string;
   children: NodeData[];
 };
 
@@ -24,6 +26,7 @@ export type ProjectData = {
   canvasPosition?: { x: number, y: number };
   canvasScale?: number;
   backgroundColor?: string;
+  layoutDirection?: 'horizontal' | 'vertical';
 };
 
 export class Store {
@@ -69,3 +72,18 @@ export class Store {
     };
   }
 }
+
+export const updateNode = (node: NodeData, id: string, text: string, image?: string, width?: number, url?: string, backgroundColor?: string, icon?: string): NodeData => {
+  if (node.id === id) {
+    return {
+      ...node,
+      text,
+      ...(image !== undefined ? { image } : {}),
+      ...(width !== undefined ? { width } : {}),
+      ...(url !== undefined ? { url } : {}),
+      ...(backgroundColor !== undefined ? { backgroundColor } : {}),
+      ...(icon !== undefined ? { icon } : {})
+    };
+  };
+  return node; // Return original node if ID doesn't match
+};

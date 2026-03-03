@@ -257,23 +257,23 @@ button {
   display: flex;
   align-items: center;
   position: relative;
-  margin: 1rem 0;
+  margin: 0.75rem 0;
 }
 
 .node-children {
   display: flex;
   flex-direction: column;
-  padding-left: 3rem;
+  padding-left: 2.5rem;
   position: relative;
 }
 
-/* Drawing connecting lines */
+/* Connecting Lines */
 .node-wrapper::before {
   content: '';
   position: absolute;
   top: 50%;
-  left: -3rem;
-  width: 3rem;
+  left: -2.5rem;
+  width: 2.5rem;
   height: 2px;
   background-color: var(--border-color);
   z-index: 0;
@@ -286,52 +286,183 @@ button {
 .node-children::before {
   content: '';
   position: absolute;
-  top: 2rem;
-  bottom: 2rem;
+  top: 1rem;
+  bottom: 1rem;
   left: 0;
   width: 2px;
   background-color: var(--border-color);
   z-index: 0;
+  border-radius: 2px;
 }
 
+/* Vertical Layout Overrides */
+.layout-vertical .node-wrapper {
+  flex-direction: column;
+  margin: 0 1rem;
+  align-items: center;
+}
+
+.layout-vertical .node-children {
+  flex-direction: row;
+  padding-left: 0;
+  padding-top: 2.5rem;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.layout-vertical .node-wrapper::before {
+  top: -2.5rem;
+  left: 50%;
+  width: 2px;
+  height: 2.5rem;
+  margin-left: -1px;
+}
+
+.layout-vertical .node-children::before {
+  top: 0;
+  bottom: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 200px);
+  /* rough approximation for connecting children */
+  min-width: 2px;
+  height: 2px;
+}
+
+.layout-vertical .node-collapse-btn {
+  right: auto;
+  left: 50%;
+  bottom: -12px;
+  top: auto;
+  transform: translateX(-50%);
+}
+
+/* Node Styling */
 .node-content {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 0.5rem;
-  padding: 1rem;
-  min-width: 300px;
-  max-width: 2000px;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  min-width: 250px;
+  max-width: 800px;
   position: relative;
   z-index: 10;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  resize: horizontal;
-  overflow: hidden;
 }
 
+/* Base selected state */
 .node-selected {
-  border-color: #60a5fa;
-  box-shadow: 0 0 15px 4px rgba(59, 130, 246, 0.6);
-  border-width: 2px;
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+  border-color: var(--accent-color) !important;
 }
 
-.node-content:hover {
-  border-color: var(--accent-color);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+/* Level 0: Root Node */
+.node-content.level-0 {
+  background-color: var(--accent-color);
+  color: #ffffff;
+  border: 2px solid var(--accent-color);
+  border-radius: 12px;
+  padding: 1rem 1.75rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  text-align: center;
 }
 
-.node-root {
+/* Level 1: Main Topics */
+.node-content.level-1 {
+  background-color: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 1.05rem;
+}
+
+.node-content.level-1:hover {
   border-color: var(--accent-color);
-  box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
-  border-width: 2px;
+}
+
+/* Level 2+: Subtopics */
+.node-content.level-2,
+.node-content.level-3,
+.node-content.level-4,
+.node-content.level-5 {
+  background-color: transparent;
+  border: none;
+  border-bottom: 2px solid var(--border-color);
+  border-radius: 0;
+  padding: 0.5rem 0.5rem;
+  box-shadow: none;
+  min-width: 150px;
+}
+
+.node-content.level-2:hover,
+.node-content.level-3:hover,
+.node-content.level-4:hover,
+.node-content.level-5:hover {
+  border-bottom-color: var(--accent-color);
+  background-color: rgba(255, 255, 255, 0.02);
 }
 
 .node-content.drag-over {
   border-color: var(--accent-hover);
   box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3);
+}
+
+/* Search Highlighting */
+.node-wrapper.search-fade>.node-content {
+  opacity: 0.2;
+  filter: grayscale(100%);
+}
+
+.node-wrapper.search-match>.node-content {
+  opacity: 1;
+  box-shadow: 0 0 0 3px var(--accent-color), 0 0 15px rgba(59, 130, 246, 0.5);
+  transform: scale(1.02);
+  z-index: 20;
+}
+
+.node-wrapper.search-fade::before,
+.node-wrapper.search-fade>.node-children::before {
+  opacity: 0.2;
+}
+
+/* Presentation Mode Overrides */
+.presentation-mode {
+  background-image: none !important;
+  /* Hide dot grid */
+}
+
+.presentation-mode .node-collapse-btn,
+.presentation-mode .node-actions,
+.presentation-mode .custom-resize-handle,
+.presentation-mode .remove-image-btn,
+.presentation-mode .node-selected {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+.presentation-mode .node-content {
+  border-color: transparent !important;
+  cursor: default !important;
+}
+
+.presentation-mode .node-text {
+  cursor: default !important;
+}
+
+.presentation-mode .node-wrapper.search-match>.node-content {
+  box-shadow: 0 0 0 1px var(--accent-color), 0 0 10px rgba(59, 130, 246, 0.3);
+  /* slightly milder highlight in present mode */
+}
+
+/* Minimap Overrides */
+.minimap-surface * {
+  pointer-events: none !important;
 }
 
 .node-collapse-btn {
@@ -367,34 +498,67 @@ button {
   white-space: pre-wrap;
   padding: 0.25rem;
   border-radius: 0.25rem;
+  min-height: 1.5rem;
+}
+
+/* Markdown overrides for tighter node fitting */
+.markdown-body p {
+  margin-top: 0;
+  margin-bottom: 0.25rem;
+}
+
+.markdown-body p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  margin: 0.25rem 0 0.25rem 1.5rem;
+  padding: 0;
+}
+
+.markdown-body li p {
+  margin: 0;
+}
+
+.markdown-body strong {
+  color: var(--text-primary);
+}
+
+.markdown-body em {
+  font-style: italic;
+  color: var(--text-secondary);
 }
 
 .node-text:hover {
-  background-color: var(--bg-tertiary);
+  background-color: rgba(255, 255, 255, 0.05);
 }
 
 .node-input {
   background: var(--bg-primary);
   border: 1px solid var(--accent-color);
-  color: var(--text-primary);
+  color: inherit;
   padding: 0.25rem;
   border-radius: 0.25rem;
   width: 100%;
   font-family: inherit;
-  font-size: 1rem;
+  font-size: inherit;
   outline: none;
 }
 
 .node-actions {
   display: flex;
-  gap: 0.5rem;
-  justify-content: flex-end;
+  gap: 0.25rem;
+  position: absolute;
+  top: 4px;
+  right: 4px;
   opacity: 0;
   transition: opacity 0.2s;
   background-color: var(--bg-tertiary);
   padding: 0.25rem;
-  border-radius: 0.25rem;
-  margin-top: 0.5rem;
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  z-index: 20;
 }
 
 .node-content:hover .node-actions {
@@ -458,4 +622,23 @@ button {
 
 .remove-image-btn:hover {
   background-color: var(--danger-color);
+}
+
+.canvas-background {
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.custom-resize-handle {
+  position: absolute;
+  right: -10px;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  cursor: ew-resize;
+  z-index: 30;
+}
+
+.custom-resize-handle:hover {
+  background: linear-gradient(90deg, transparent 45%, var(--accent-color) 45%, var(--accent-color) 55%, transparent 55%);
 }
