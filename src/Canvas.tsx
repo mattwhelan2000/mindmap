@@ -187,7 +187,12 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
             if (!selectedNodeIds.includes(id)) {
                 setSelectedNodeIds([id]);
             }
-            setContextMenu({ x: e.clientX, y: e.clientY, nodeId: id });
+
+            const rect = canvasRef.current?.getBoundingClientRect();
+            const x = rect ? e.clientX - rect.left : e.clientX;
+            const y = rect ? e.clientY - rect.top : e.clientY;
+
+            setContextMenu({ x, y, nodeId: id });
         } else {
             e.preventDefault(); // allow RMB dragging without context menu natively
         }
