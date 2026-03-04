@@ -850,7 +850,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
 
                     {/* Styling Controls */}
                     <div style={{ padding: '0.5rem 1rem', display: 'flex', flexWrap: 'wrap', gap: '4px', borderTop: '1px solid var(--border-color)' }}>
-                        {['transparent', '#7f1d1d', '#14532d', '#1e3a8a', '#713f12', '#4a044e', '#831843', '#7c2d12', '#064e3b', '#312e81'].map(color => (
+                        {['transparent', '#7f1d1d', '#000000', '#1e3a8a', '#713f12', '#4a044e', '#831843', '#7c2d12', '#064e3b', '#312e81'].map(color => (
                             <button
                                 key={color}
                                 style={{
@@ -956,21 +956,14 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                     }}>Add Hyperlink</button>
                     <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={(e) => {
                         e.stopPropagation();
-                        // Add images logic
                         const updatedIds = selectedNodeIds.length > 0 ? selectedNodeIds : [contextMenu.nodeId];
                         let updatedRoot = project.rootNode;
                         updatedIds.forEach(id => {
-                            const node = getTopLevelSelectedNodes(project.rootNode, [id])[0];
-                            if (node) {
-                                // Image lookup from pollination ai with the node text and random seed to prevent caching
-                                const seed = Math.floor(Math.random() * 100000);
-                                const imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(node.text.substring(0, 100))}?width=800&height=600&nologo=true&seed=${seed}`;
-                                updatedRoot = updateNodeRec(updatedRoot, id, n => ({ ...n, image: imgUrl }));
-                            }
+                            updatedRoot = updateNodeRec(updatedRoot, id, n => ({ ...n, image: undefined }));
                         });
                         commitUpdate(updatedRoot);
                         closeContextMenu();
-                    }}>Add Images</button>
+                    }}>Remove Image</button>
                     <button className="btn-secondary" style={{ color: 'red', border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={(e) => {
                         e.stopPropagation();
                         // Delete logic
