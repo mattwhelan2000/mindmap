@@ -982,7 +982,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                 <button
                     className="btn-primary"
                     style={{
-                        position: 'absolute', top: 20, right: 20, zIndex: 1000,
+                        position: 'fixed', top: 20, right: 20, zIndex: 1000,
                         padding: '0.75rem 1.5rem', borderRadius: '2rem',
                         boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
                         fontSize: '1.1rem', fontWeight: 600
@@ -997,7 +997,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                 <div
                     className="canvas-toolbar"
                     style={{
-                        position: 'absolute', top: 20, left: 20, right: 20, zIndex: 1000,
+                        position: 'fixed', top: 20, left: 20, right: 20, zIndex: 1000,
                         display: 'flex', gap: '0.5rem', background: 'var(--bg-secondary)',
                         padding: '0.5rem', borderRadius: '0.5rem', boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
                         alignItems: 'center', flexWrap: 'wrap', maxWidth: 'calc(100% - 40px)'
@@ -1098,7 +1098,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
             )}
 
             {!isPresenting && (
-                <div className="canvas-zoom-controls" style={{ position: 'absolute', bottom: 20, right: 20, zIndex: 1000, display: 'flex', gap: '0.5rem', background: 'var(--bg-secondary)', padding: '0.5rem', borderRadius: '0.5rem', flexWrap: 'wrap', maxWidth: 'calc(100% - 40px)' }}>
+                <div className="canvas-zoom-controls" style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000, display: 'flex', gap: '0.5rem', background: 'var(--bg-secondary)', padding: '0.5rem', borderRadius: '0.5rem', flexWrap: 'wrap', maxWidth: 'calc(100% - 40px)' }}>
                     <button className="btn-secondary" onClick={handleFullscreen} title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}>{isFullscreen ? '⤡' : '⤢'}</button>
                     <button className="btn-secondary" onClick={handleCenterNode} title="Re-Center on Root Node">⌖</button>
                     <button className="btn-secondary" onClick={handleFrameAll} title="Frame Entire Tree">[ ]</button>
@@ -1113,7 +1113,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                 <div
                     className="minimap-container"
                     style={{
-                        position: 'absolute',
+                        position: 'fixed',
                         left: 20,
                         bottom: 20,
                         width: '200px',
