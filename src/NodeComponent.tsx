@@ -17,6 +17,13 @@ interface NodeProps {
     searchQuery?: string;
 }
 
+const getYouTubeVideoId = (text: string | undefined): string | null => {
+    if (!text) return null;
+    const regExp = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+    const match = text.match(regExp);
+    return match ? match[1] : null;
+};
+
 export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, onMoveNode, onToggleCollapse, onAddSibling, selectedNodeIds, isRoot, level = 0, searchQuery }: NodeProps) {
     const [isEditing, setIsEditing] = useState(node.text === 'New Idea');
     const [text, setText] = useState(node.text);
@@ -214,6 +221,20 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
                                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{node.text || 'Empty node'}</ReactMarkdown>
                             </div>
                         </div>
+                        {(getYouTubeVideoId(node.url) || getYouTubeVideoId(node.text)) && (
+                            <div style={{ marginTop: '0.5rem', borderRadius: '0.25rem', overflow: 'hidden' }}>
+                                <iframe
+                                    width="100%"
+                                    height="180"
+                                    src={`https://www.youtube.com/embed/${getYouTubeVideoId(node.url) || getYouTubeVideoId(node.text)}`}
+                                    title="YouTube video player"
+                                    frameBorder="0"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                    allowFullScreen
+                                    style={{ display: 'block' }}
+                                ></iframe>
+                            </div>
+                        )}
                         {node.url && (
                             <div className="node-url-container" style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
                                 <a href={node.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-color)' }} onClick={e => e.stopPropagation()}>

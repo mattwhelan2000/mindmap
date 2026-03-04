@@ -96,6 +96,74 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
                 Store.saveProject(newProject);
                 loadProjects();
 
+            } else if (fileName.endsWith('.zip')) {
+                const zip = new JSZip();
+                const loadedZip = await zip.loadAsync(file);
+                const jsonFile = loadedZip.file('project.json');
+
+                if (!jsonFile) throw new Error("Could not find project.json inside the ZIP archive.");
+                const jsonStr = await jsonFile.async('string');
+                const data = JSON.parse(jsonStr);
+
+                // Re-hydrate images
+                const imagesMap = new Map<string, string>();
+                const imgFolder = loadedZip.folder("images");
+                if (imgFolder) {
+                    for (const relativePath in imgFolder.files) {
+                        const fileObj = imgFolder.files[relativePath];
+                        if (!fileObj.dir) {
+                            const ext = relativePath.split('.').pop()?.toLowerCase() || 'png';
+                            const mimeMap: Record<string, string> = { jpg: 'jpeg', jpeg: 'jpeg', png: 'png', gif: 'gif', webp: 'webp' };
+                            const mime = mimeMap[ext] || 'png';
+                            const base64 = await fileObj.async("base64");
+                            imagesMap.set(`./images/${relativePath}`, `data:image/${mime};base64,${base64}`);
+                        }
+                    }
+                }
+
+                // Generic recursive function to fix image URIs and issue new IDs on import
+                const fixNodes = (n: any): any => {
+                    let img = n.image || n.img || n.thumbnail;
+                    if (img && img.startsWith('./images/') && imagesMap.has(img)) {
+                        img = imagesMap.get(img);
+                    }
+                    return {
+                        id: generateId(),
+                        text: n.text || n.title || n.name || 'Untitled',
+                        image: img,
+                        width: n.width,
+                        isCollapsed: !!n.isCollapsed,
+                        backgroundColor: n.backgroundColor,
+                        icon: n.icon,
+                        url: n.url,
+                        children: Array.isArray(n.children) ? n.children.map(fixNodes) : []
+                    };
+                };
+
+                const parseGenericProjectData = (genericData: any) => {
+                    let rootNode;
+                    if (genericData.rootNode) {
+                        rootNode = fixNodes(genericData.rootNode);
+                    } else {
+                        rootNode = fixNodes(genericData);
+                    }
+                    return rootNode;
+                };
+
+                const rootNode = parseGenericProjectData(data);
+                const newProject: ProjectData = {
+                    id: generateId(),
+                    name: data.name || file.name.replace(/\.zip$/i, ''),
+                    updatedAt: Date.now(),
+                    canvasScale: data.canvasScale,
+                    canvasPosition: data.canvasPosition,
+                    backgroundColor: data.backgroundColor,
+                    thumbnail: data.thumbnail,
+                    rootNode: rootNode
+                };
+
+                Store.saveProject(newProject);
+                loadProjects();
             } else {
                 const text = await file.text();
                 const fileName = file.name.toLowerCase();
@@ -204,8 +272,8 @@ export default function Dashboard({ onOpenProject }: DashboardProps) {
                 <p>A simple, powerful mind mapping tool.</p>
                 <div style={{ marginTop: '1rem' }}>
                     <label className="btn-secondary" style={{ cursor: 'pointer', display: 'inline-block' }}>
-                        Import Map (.json, .md, .xmind)
-                        <input type="file" accept=".json,.md,.xmind" onChange={handleImport} style={{ display: 'none' }} />
+                        Import Map (.zip, .json, .md, .xmind)
+                        <input type="file" accept=".zip,.json,.md,.xmind" onChange={handleImport} style={{ display: 'none' }} />
                     </label>
                 </div>
             </div>

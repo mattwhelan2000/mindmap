@@ -3,6 +3,7 @@ import type { ProjectData, NodeData } from './store';
 import { generateId } from './store';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import JSZip from 'jszip';
 import NodeComponent from './NodeComponent';
 
 interface CanvasProps {
@@ -109,7 +110,9 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                     } else if (e.shiftKey) {
                         setSelectedNodeIds(prev => prev.includes(id) ? prev : [...prev, id]);
                     } else {
-                        setSelectedNodeIds([id]);
+                        // If clicking an already selected node, keep selection so we can drag all of them.
+                        // If clicking an unselected node, select only that one.
+                        setSelectedNodeIds(prev => prev.includes(id) ? prev : [id]);
                     }
                 }
             }
@@ -602,13 +605,42 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [selectedNodeIds, project.rootNode, onUpdate, history]);
 
-    const handleExportJSON = () => {
-        const jsonStr = JSON.stringify(project);
-        const blob = new Blob([jsonStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
+    const handleExportZip = async () => {
+        const zip = new JSZip();
+        const imagesFolder = zip.folder("images");
+
+        // Deep copy project to avoid mutating the live state
+        const pCopy = JSON.parse(JSON.stringify(project)) as ProjectData;
+
+        // Recursively extract images
+        const extractImages = (node: NodeData) => {
+            if (node.image && node.image.startsWith('data:image')) {
+                // Determine extension from MIME type
+                const mimeMatch = node.image.match(/^data:image\/(\w+);base64,/);
+                const ext = mimeMatch ? (mimeMatch[1] === 'jpeg' ? 'jpg' : mimeMatch[1]) : 'png';
+                const base64Data = node.image.replace(/^data:image\/\w+;base64,/, "");
+                const filename = `${node.id}.${ext}`;
+
+                // Add to zip folder
+                if (imagesFolder) {
+                    imagesFolder.file(filename, base64Data, { base64: true });
+                }
+
+                // Replace inline data string with relative path
+                node.image = `./images/${filename}`;
+            }
+            node.children.forEach(extractImages);
+        };
+        extractImages(pCopy.rootNode);
+
+        const jsonStr = JSON.stringify(pCopy, null, 2);
+        zip.file("project.json", jsonStr);
+
+        const content = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(content);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `MindMap_${project.name.replace(/\s+/g, '_')}.json`;
+        a.download = `${project.name.replace(/\s+/g, '_')}.zip`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -681,37 +713,70 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
         }
     };
 
-    const handlePartialImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handlePartialImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file || !contextMenu) return;
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            try {
-                const data = JSON.parse(event.target?.result as string);
+        try {
+            let data: any = null;
+            let zipInstance: JSZip | null = null;
+            let imagesMap = new Map<string, string>();
 
-                const cloneAndNewIds = (n: any): NodeData => ({
+            if (file.name.endsWith('.zip')) {
+                zipInstance = await JSZip.loadAsync(file);
+                const jsonFile = zipInstance.file("project.json");
+                if (!jsonFile) throw new Error("No project.json found in ZIP.");
+                const jsonStr = await jsonFile.async("string");
+                data = JSON.parse(jsonStr);
+
+                // Pre-load all images into a map of path -> base64 Data URI
+                const imgFolder = zipInstance.folder("images");
+                if (imgFolder) {
+                    for (const relativePath in imgFolder.files) {
+                        const fileObj = imgFolder.files[relativePath];
+                        if (!fileObj.dir) {
+                            const ext = relativePath.split('.').pop()?.toLowerCase() || 'png';
+                            const mimeMap: Record<string, string> = { jpg: 'jpeg', jpeg: 'jpeg', png: 'png', gif: 'gif', webp: 'webp' };
+                            const mime = mimeMap[ext] || 'png';
+                            const base64 = await fileObj.async("base64");
+                            imagesMap.set(`./images/${relativePath}`, `data:image/${mime};base64,${base64}`);
+                        }
+                    }
+                }
+            } else {
+                const text = await file.text();
+                data = JSON.parse(text);
+            }
+
+            const cloneAndNewIds = (n: any): NodeData => {
+                let img = n.image || n.img || n.thumbnail;
+                // Hydrate relative image paths if they exist
+                if (img && img.startsWith('./images/') && imagesMap.has(img)) {
+                    img = imagesMap.get(img);
+                }
+
+                return {
                     id: generateId(),
                     text: n.text || n.title || n.name || 'Untitled',
-                    image: n.image || n.img || n.thumbnail,
+                    image: img,
                     isCollapsed: !!n.isCollapsed,
                     children: Array.isArray(n.children) ? n.children.map(cloneAndNewIds) : []
-                });
+                };
+            };
 
-                const importedRootNode = data.rootNode ? cloneAndNewIds(data.rootNode) : cloneAndNewIds(data);
+            const importedRootNode = data.rootNode ? cloneAndNewIds(data.rootNode) : cloneAndNewIds(data);
 
-                const updatedRoot = updateNodeRec(project.rootNode, contextMenu.nodeId, n => ({
-                    ...n,
-                    children: [...n.children, importedRootNode],
-                    isCollapsed: false
-                }));
-                commitUpdate(updatedRoot);
-            } catch (err) {
-                alert("Invalid Mind Map JSON format.");
-            }
-            closeContextMenu();
-        };
-        reader.readAsText(file);
+            const updatedRoot = updateNodeRec(project.rootNode, contextMenu.nodeId, n => ({
+                ...n,
+                children: [...n.children, importedRootNode],
+                isCollapsed: false
+            }));
+            commitUpdate(updatedRoot);
+        } catch (err) {
+            console.error(err);
+            alert("Failed to import Mind Map file.");
+        }
+        closeContextMenu();
         e.target.value = '';
     };
 
@@ -767,8 +832,8 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                     <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={(e) => {
                         e.stopPropagation();
                         if (importInputRef.current) importInputRef.current.click();
-                    }}>Import JSON as Child</button>
-                    <input type="file" accept=".json" style={{ display: 'none' }} ref={importInputRef} onChange={handlePartialImport} />
+                    }}>Import Zip/JSON as Child</button>
+                    <input type="file" accept=".json,.zip" style={{ display: 'none' }} ref={importInputRef} onChange={handlePartialImport} />
 
                     {/* Styling Controls */}
                     <div style={{ padding: '0.5rem 1rem', display: 'flex', gap: '4px', borderTop: '1px solid var(--border-color)' }}>
@@ -1021,7 +1086,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                                 borderRadius: '0.5rem', display: 'flex', flexDirection: 'column',
                                 boxShadow: '0 4px 6px rgba(0,0,0,0.3)', minWidth: '150px', zIndex: 20
                             }}>
-                                <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={handleExportJSON}>Export JSON</button>
+                                <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={handleExportZip}>Export ZIP Project</button>
                                 <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={handleExportMarkdown}>Export Markdown</button>
                                 <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={handleExportPDF}>Export PDF</button>
                             </div>
