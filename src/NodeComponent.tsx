@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { NodeData } from './store';
+import { compressImage } from './utils';
 
 interface NodeProps {
     node: NodeData;
@@ -111,9 +112,10 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
         const file = e.target.files?.[0];
         if (file) {
             const reader = new FileReader();
-            reader.onload = (event) => {
-                const base64 = event.target?.result as string;
-                onUpdate(node.id, node.text, base64, node.width, node.url);
+            reader.onload = async (event) => {
+                const rawBase64 = event.target?.result as string;
+                const compressedBase64 = await compressImage(rawBase64, 800, 800);
+                onUpdate(node.id, node.text, compressedBase64, node.width, node.url);
             };
             reader.readAsDataURL(file);
         }

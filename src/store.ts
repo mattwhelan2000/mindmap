@@ -50,7 +50,15 @@ export class Store {
     } else {
       projects.push(project);
     }
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(projects));
+    try {
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(projects));
+    } catch (e: any) {
+      if (e.name === 'QuotaExceededError' || e.message.includes('quota')) {
+        alert('MindMap Save Error: You have reached the storage limit for this browser. Please export your project to a ZIP file to back it up, or remove some large images. Recent changes may not be saved.');
+      } else {
+        alert('Failed to save project: ' + e.message);
+      }
+    }
   }
 
   static deleteProject(id: string) {

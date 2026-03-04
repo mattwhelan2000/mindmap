@@ -5,6 +5,7 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import JSZip from 'jszip';
 import NodeComponent from './NodeComponent';
+import { compressImage } from './utils';
 
 interface CanvasProps {
     project: ProjectData;
@@ -1290,8 +1291,10 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                                 if (file && file.type.startsWith('image/')) {
                                     e.preventDefault();
                                     const reader = new FileReader();
-                                    reader.onload = (event) => {
-                                        handleImageUpdate(imageModalNodeId, event.target?.result as string);
+                                    reader.onload = async (event) => {
+                                        const rawBase64 = event.target?.result as string;
+                                        const compressedBase64 = await compressImage(rawBase64, 800, 800);
+                                        handleImageUpdate(imageModalNodeId, compressedBase64);
                                         setImageModalNodeId(null);
                                     };
                                     reader.readAsDataURL(file);
@@ -1311,9 +1314,10 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                                         const file = e.target.files?.[0];
                                         if (file) {
                                             const reader = new FileReader();
-                                            reader.onload = (event) => {
-                                                const base64 = event.target?.result as string;
-                                                handleImageUpdate(imageModalNodeId, base64);
+                                            reader.onload = async (event) => {
+                                                const rawBase64 = event.target?.result as string;
+                                                const compressedBase64 = await compressImage(rawBase64, 800, 800);
+                                                handleImageUpdate(imageModalNodeId, compressedBase64);
                                                 setImageModalNodeId(null);
                                             };
                                             reader.readAsDataURL(file);
