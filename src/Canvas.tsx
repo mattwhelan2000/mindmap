@@ -895,6 +895,31 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                         ))}
                     </div>
 
+                    {/* Font Size Controls */}
+                    <div style={{ padding: '0.5rem 1rem', display: 'flex', gap: '4px', borderBottom: '1px solid var(--border-color)' }}>
+                        {[{ label: 'S', size: '0.85rem' }, { label: 'M', size: '1rem' }, { label: 'L', size: '1.25rem' }, { label: 'XL', size: '1.5rem' }].map(opt => (
+                            <button
+                                key={opt.label}
+                                className="btn-secondary"
+                                style={{ flex: 1, padding: '0.2rem 0', fontSize: '0.8rem' }}
+                                title={`Set font size to ${opt.label}`}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    const updatedIds = selectedNodeIds.length > 0 ? selectedNodeIds : [contextMenu.nodeId];
+                                    let updatedRoot = project.rootNode;
+                                    updatedIds.forEach(id => {
+                                        // M is default/null
+                                        updatedRoot = updateNodeRec(updatedRoot, id, n => ({ ...n, fontSize: opt.size === '1rem' ? undefined : opt.size }));
+                                    });
+                                    commitUpdate(updatedRoot);
+                                    closeContextMenu();
+                                }}
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
+                    </div>
+
                     <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={(e) => {
                         e.stopPropagation();
                         const updatedIds = selectedNodeIds.length > 0 ? selectedNodeIds : [contextMenu.nodeId];

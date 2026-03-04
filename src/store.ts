@@ -14,6 +14,7 @@ export type NodeData = {
   width?: number; // Added to persist manual scaling
   backgroundColor?: string;
   icon?: string;
+  fontSize?: string;
   children: NodeData[];
 };
 
@@ -81,7 +82,7 @@ export class Store {
   }
 }
 
-export const updateNode = (node: NodeData, id: string, text: string, image?: string, width?: number, url?: string, backgroundColor?: string, icon?: string): NodeData => {
+export const updateNode = (node: NodeData, id: string, text: string, image?: string, width?: number, url?: string, backgroundColor?: string, icon?: string, fontSize?: string): NodeData => {
   if (node.id === id) {
     return {
       ...node,
@@ -90,7 +91,8 @@ export const updateNode = (node: NodeData, id: string, text: string, image?: str
       ...(width !== undefined ? { width } : {}),
       ...(url !== undefined ? { url } : {}),
       ...(backgroundColor !== undefined ? { backgroundColor } : {}),
-      ...(icon !== undefined ? { icon } : {})
+      ...(icon !== undefined ? { icon } : {}),
+      ...(fontSize !== undefined ? { fontSize } : {})
     };
   };
   return node; // Return original node if ID doesn't match

@@ -187,7 +187,8 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
                     borderBottom: dragPlacement === 'after' ? '3px solid var(--accent-color)' : undefined,
                     outline: dragPlacement === 'inside' ? '3px solid var(--accent-color)' : undefined,
                     width: node.width ? `${node.width}px` : undefined,
-                    backgroundColor: node.backgroundColor ? node.backgroundColor : undefined
+                    backgroundColor: node.backgroundColor ? node.backgroundColor : undefined,
+                    fontSize: node.fontSize ? node.fontSize : undefined
                 }}
                 draggable={!isEditing && !isRoot}
                 onDragStart={handleDragStart}
