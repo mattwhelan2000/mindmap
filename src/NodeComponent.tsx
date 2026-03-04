@@ -11,6 +11,7 @@ interface NodeProps {
     onMoveNode: (draggedId: string, targetId: string, placement?: 'before' | 'after' | 'inside') => void;
     onToggleCollapse?: (id: string, isCollapsed: boolean, recursive?: boolean) => void;
     onAddSibling?: (id: string) => void;
+    onShowImageModal?: (id: string) => void;
     selectedNodeIds?: string[];
     isRoot?: boolean;
     level?: number;
@@ -24,7 +25,7 @@ const getYouTubeVideoId = (text: string | undefined): string | null => {
     return match ? match[1] : null;
 };
 
-export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, onMoveNode, onToggleCollapse, onAddSibling, selectedNodeIds, isRoot, level = 0, searchQuery }: NodeProps) {
+export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, onMoveNode, onToggleCollapse, onAddSibling, onShowImageModal, selectedNodeIds, isRoot, level = 0, searchQuery }: NodeProps) {
     const [isEditing, setIsEditing] = useState(node.text === 'New Idea');
     const [text, setText] = useState(node.text);
     const [dragPlacement, setDragPlacement] = useState<'before' | 'after' | 'inside' | null>(null);
@@ -246,7 +247,13 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
                 )}
 
                 <div className="node-actions" onClick={e => e.stopPropagation()}>
-                    <button className="node-action-btn" title="Add Image" onClick={() => fileInputRef.current?.click()}>
+                    <button className="node-action-btn" title="Add Image" onClick={() => {
+                        if (onShowImageModal) {
+                            onShowImageModal(node.id);
+                        } else {
+                            fileInputRef.current?.click();
+                        }
+                    }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
                     </button>
                     <input
@@ -292,6 +299,7 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
                             onMoveNode={onMoveNode}
                             onToggleCollapse={onToggleCollapse}
                             onAddSibling={onAddSibling}
+                            onShowImageModal={onShowImageModal}
                             selectedNodeIds={selectedNodeIds}
                             level={level + 1}
                             searchQuery={searchQuery}

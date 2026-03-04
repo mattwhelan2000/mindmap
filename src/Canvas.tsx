@@ -32,6 +32,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
     const [searchQuery, setSearchQuery] = useState('');
     const [isPresenting, setIsPresenting] = useState(false);
     const [showControls, setShowControls] = useState(false);
+    const [imageModalNodeId, setImageModalNodeId] = useState<string | null>(null);
 
     useEffect(() => {
         const handleFullscreenChange = () => {
@@ -48,6 +49,12 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
     const commitUpdate = (newRoot: NodeData, newTitle?: string) => {
         setHistory(prev => [...prev.slice(-49), project.rootNode]);
         onUpdate({ ...project, rootNode: newRoot, name: newTitle ?? project.name, updatedAt: Date.now() });
+    };
+
+    const handleImageUpdate = (nodeId: string, imageUrl: string) => {
+        let updatedRoot = project.rootNode;
+        updatedRoot = updateNodeRec(updatedRoot, nodeId, n => ({ ...n, image: imageUrl }));
+        commitUpdate(updatedRoot);
     };
 
     const handleTitleBlur = () => {
@@ -1142,6 +1149,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                             onAddChild={() => { }}
                             onDelete={() => { }}
                             onMoveNode={() => { }}
+                            onShowImageModal={() => { }}
                             selectedNodeIds={[]}
                             isRoot={true}
                             searchQuery={searchQuery}
@@ -1184,6 +1192,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                     onMoveNode={handleMoveNode}
                     onToggleCollapse={handleToggleCollapse}
                     onAddSibling={handleAddSibling}
+                    onShowImageModal={setImageModalNodeId}
                     selectedNodeIds={selectedNodeIds}
                     isRoot={true}
                     searchQuery={searchQuery}
@@ -1245,6 +1254,73 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
 
                             <strong style={{ color: 'var(--accent-color)' }}>ContextMenu / Colors</strong>
                             <span>Right-click any node</span>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Image Modal */}
+            {imageModalNodeId && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setImageModalNodeId(null)}>
+                    <div className="controls-modal" style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', width: '400px', display: 'flex', flexDirection: 'column', gap: '1rem' }} onClick={e => e.stopPropagation()}>
+                        <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>Add Image</h3>
+                        <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: 0 }}>
+                            Paste an image (Ctrl+V), enter a URL, or browse files.
+                        </p>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--accent-color)', margin: 0, marginBottom: '0.5rem' }}>
+                            Note: Browsing files natively forces browsers out of full-screen mode.
+                        </p>
+
+                        <input
+                            autoFocus
+                            type="text"
+                            placeholder="https://example.com/image.png or Ctrl+V"
+                            style={{
+                                background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
+                                padding: '0.75rem', borderRadius: '0.5rem', outline: 'none', width: '100%', boxSizing: 'border-box'
+                            }}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                    handleImageUpdate(imageModalNodeId, e.currentTarget.value);
+                                    setImageModalNodeId(null);
+                                }
+                            }}
+                            onPaste={e => {
+                                const file = e.clipboardData.files?.[0] || Array.from(e.clipboardData.items).find(i => i.type.startsWith('image/'))?.getAsFile();
+                                if (file && file.type.startsWith('image/')) {
+                                    e.preventDefault();
+                                    const reader = new FileReader();
+                                    reader.onload = (event) => {
+                                        handleImageUpdate(imageModalNodeId, event.target?.result as string);
+                                        setImageModalNodeId(null);
+                                    };
+                                    reader.readAsDataURL(file);
+                                }
+                            }}
+                        />
+
+                        <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                            <button className="btn-secondary" onClick={() => setImageModalNodeId(null)} style={{ flex: 1 }}>Cancel</button>
+                            <label className="btn-primary" style={{ flex: 1, textAlign: 'center', cursor: 'pointer', display: 'block', padding: '0.6em 1.2em', borderRadius: '8px' }}>
+                                Browse Files...
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    style={{ display: 'none' }}
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            const reader = new FileReader();
+                                            reader.onload = (event) => {
+                                                const base64 = event.target?.result as string;
+                                                handleImageUpdate(imageModalNodeId, base64);
+                                                setImageModalNodeId(null);
+                                            };
+                                            reader.readAsDataURL(file);
+                                        }
+                                    }}
+                                />
+                            </label>
                         </div>
                     </div>
                 </div>
