@@ -814,7 +814,7 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
             onContextMenu={handleContextMenu}
             style={{
                 width: '100%',
-                height: '100%',
+                height: '100vh',
                 overflow: 'hidden',
                 position: 'relative',
                 cursor: isPanning ? 'grabbing' : isZooming ? 'ns-resize' : 'default',
