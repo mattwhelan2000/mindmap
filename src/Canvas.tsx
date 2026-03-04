@@ -849,8 +849,8 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                     <input type="file" accept=".json,.zip" style={{ display: 'none' }} ref={importInputRef} onChange={handlePartialImport} />
 
                     {/* Styling Controls */}
-                    <div style={{ padding: '0.5rem 1rem', display: 'flex', gap: '4px', borderTop: '1px solid var(--border-color)' }}>
-                        {['transparent', '#7f1d1d', '#14532d', '#1e3a8a', '#713f12'].map(color => (
+                    <div style={{ padding: '0.5rem 1rem', display: 'flex', flexWrap: 'wrap', gap: '4px', borderTop: '1px solid var(--border-color)' }}>
+                        {['transparent', '#7f1d1d', '#14532d', '#1e3a8a', '#713f12', '#4a044e', '#831843', '#7c2d12', '#064e3b', '#312e81'].map(color => (
                             <button
                                 key={color}
                                 style={{
@@ -896,6 +896,19 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
                             </button>
                         ))}
                     </div>
+
+                    <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={(e) => {
+                        e.stopPropagation();
+                        const updatedIds = selectedNodeIds.length > 0 ? selectedNodeIds : [contextMenu.nodeId];
+                        updatedIds.forEach(id => handleToggleCollapse(id, true, true));
+                        closeContextMenu();
+                    }}>Close Selected</button>
+                    <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={(e) => {
+                        e.stopPropagation();
+                        const updatedIds = selectedNodeIds.length > 0 ? selectedNodeIds : [contextMenu.nodeId];
+                        updatedIds.forEach(id => handleToggleCollapse(id, false, true));
+                        closeContextMenu();
+                    }}>Open Selected</button>
 
                     <button className="btn-secondary" style={{ border: 'none', background: 'transparent', textAlign: 'left', padding: '0.5rem 1rem', borderRadius: 0 }} onClick={(e) => {
                         e.stopPropagation();
