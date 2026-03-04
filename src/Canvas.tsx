@@ -332,14 +332,12 @@ export default function Canvas({ project, onBack, onUpdate }: CanvasProps) {
 
     const handleDeleteNode = (id: string) => {
         if (id === project.rootNode.id) {
-            alert("Cannot delete the root node.");
+            // Silently prevent deleting the root node without breaking fullscreen via alert()
             return;
         }
-        if (confirm('Delete this branch?')) {
-            const updatedRoot = deleteNodeRec(project.rootNode, id);
-            if (updatedRoot) {
-                commitUpdate(updatedRoot);
-            }
+        const updatedRoot = deleteNodeRec(project.rootNode, id);
+        if (updatedRoot) {
+            commitUpdate(updatedRoot);
         }
     };
 

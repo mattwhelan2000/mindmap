@@ -32,6 +32,7 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
     const [dragPlacement, setDragPlacement] = useState<'before' | 'after' | 'inside' | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const nodeRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLTextAreaElement>(null);
     const isResizingRef = useRef(false);
     const startWidthRef = useRef<number | null>(null);
     const startXRef = useRef<number | null>(null);
@@ -82,6 +83,12 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
         }
     };
 
+    useEffect(() => {
+        if (isEditing && inputRef.current && text === 'New Idea') {
+            inputRef.current.select();
+        }
+    }, [isEditing]);
+
     const isSearchMatch = searchQuery && searchQuery.trim() !== '' && node.text.toLowerCase().includes(searchQuery.toLowerCase());
     const isSearchActive = searchQuery && searchQuery.trim() !== '';
     const searchClass = isSearchActive ? (isSearchMatch ? 'search-match' : 'search-fade') : '';
@@ -97,9 +104,6 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleBlur();
-            if (onAddSibling && !isRoot) {
-                onAddSibling(node.id);
-            }
         }
         if (e.key === 'Tab') {
             e.preventDefault();
@@ -207,6 +211,7 @@ export default function NodeComponent({ node, onUpdate, onAddChild, onDelete, on
 
                 {isEditing ? (
                     <textarea
+                        ref={inputRef}
                         autoFocus
                         className="node-input"
                         value={text}
